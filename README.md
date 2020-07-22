@@ -4,7 +4,7 @@ This repository contains the official Pytorch implementation of our paper: "Pixe
 [[Project page]](http://imagine.enpc.fr/~qiux/P2ORM/)
 
 <p align="center">
-<img src="https://github.com/tim885/P2ORM/blob/master/img/overview.png" width="800px" alt="teaser">
+<img src="https://github.com/tim885/P2ORM/blob/master/img/overview.PNG" width="800px" alt="teaser">
 </p>
 
 If our project is helpful for your research, please consider citing : 
@@ -17,10 +17,10 @@ If our project is helpful for your research, please consider citing :
 ```
 
 ## Table of content
-* [1. Visual Results](#visual_results)
-* [2. Installation](#installation)
-* [3. Evaluation](#evaluation)
-* [4. Train](#train)
+* [1. Visual Results](#1-visual-results)
+* [2. Installation](#2-installation)
+* [3. Evaluation](#3-evaluation)
+* [4. Train](#4-train)
 
 ## 1. Visual Results
 ### 1.1 Occlusion boundary and orientation estimation
