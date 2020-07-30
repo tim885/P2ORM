@@ -9,11 +9,12 @@ This repository contains the official Pytorch implementation of our paper: "Pixe
 
 If our project is helpful for your research, please consider citing : 
 ``` 
-@inproceedings{Qiu2020P2ORM,
+@inproceedings{qiu2020pixel,
   title     = {Pixel-{P}air Occlusion Relationship Map ({P2ORM}): Formulation, Inference \& Application},
   author    = {Xuchong Qiu and Yang Xiao and Chaohui Wang and Renaud Marlet},
   booktitle = {European Conference on Computer Vision (ECCV)},
-  year      = {2020}}
+  year      = {2020}
+}
 ```
 
 ## Table of content
