@@ -1,5 +1,8 @@
-# methods for label generation
-# by xuchong, 2019/06
+# --------------------------------------------------------
+# P2ORM: Formulation, Inference & Application
+# Licensed under The MIT License [see LICENSE for details]
+# Written by Xuchong Qiu
+# --------------------------------------------------------
 
 import cv2
 import sys
@@ -7,13 +10,10 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-import json
 import itertools
-import os
-from scipy import spatial, cos, pi, ndimage
-from skimage.segmentation import find_boundaries
+from PIL import Image
+from scipy import pi, ndimage
 sys.path.append('../..')
-from detect_occ.utils.segmentation_utils import *
 from math import atan, tan
 PI = 3.1416
 
@@ -132,10 +132,8 @@ def gen_occ_order(K, depth, label_map, invalid_mask, ROI_sz, thr_depth, normal=N
                         tan_gamma = np.minimum(np.tan(gamma_roi), 1.)  # consider possible normal estimation err
                         tan_gamma = np.maximum(tan_gamma, 0.0001)  # required: tan(gamma) >> tan(err_d_ibims)
                         depth_err = eta_d_ibims / tan_gamma * ROI_depth_L[2, 2] + err_d_ibims
-                        # print('center ray', center_ray_unit, 'center normal', center_normal_unit)
                         thr_depth = 25. + depth_err[4] + np.delete(depth_err, 4)  # 8,
                         depth_err_map[y_idx, x_idx] = depth_err[4]
-                        # print('alpha angle(rad)', alpha, 'GT depth err(mm)', depth_err, 'diff thresh(mm)', thr_depth_b)
 
                     # guess zero-value neighbor depth by 3x3 average depth
                     if np.any(ROI_depth_L[1:-1, 1:-1] == 0):
@@ -314,11 +312,6 @@ def occ_fg_to_order(fg, bg, ROI_sz=3, fill_bg_hole=True, interpolate=False):
                 bg_ROI_L[bg_ROI_L == 1] = -1
                 bg_ROI_L[fg_ROI_L == 1] = 0  # rm fg contour pixels
 
-                # # fill holes in bg_ROI_L which should be neutral(optional)
-                # bg_ROI_L += 1  # [0,-1] => [1,0]
-                # bg_ROI_L = ndimage.binary_fill_holes(bg_ROI_L).astype(np.int32)
-                # bg_ROI_L += -1  # [1,0] => [0,-1]
-
             bg_ROI = bg_ROI_L[1:-1, 1:-1]  # 5,5 => 3,3
             fg_ROI = fg_ROI_L[1:-1, 1:-1]  # 5,5 => 3,3
             new_bg_pad_1[y_idx:(y_idx + ROI_sz), x_idx:(x_idx + ROI_sz)] = bg_ROI.astype(np.int32)
@@ -328,19 +321,15 @@ def occ_fg_to_order(fg, bg, ROI_sz=3, fill_bg_hole=True, interpolate=False):
             else:
                 new_fg_pad_1[y_idx + 1, x_idx + 1] = 1
 
-            # bg_ROI = np.copy(
-            #     bg_pad[y_idx:(y_idx + ROI_sz), x_idx:(x_idx + ROI_sz)])  # 3,3
             bg_ROI_flat = np.delete(bg_ROI.flatten(), (ROI_sz * ROI_sz - 1) / 2)  # 8,
 
             # assign contour label to fg/bg pixs
             occ_order_pair_pad[y_idx:(y_idx + ROI_sz), x_idx:(x_idx + ROI_sz), 0].reshape(3, 3)[bg_ROI == -1] = 1
-            # occ_order_pair_pad[y_idx + 1, x_idx + 1, 0] = 1.  # fg contour pixel
 
             diff = fg[y_idx, x_idx] - bg_ROI_flat  # diff between p and neighbor q; 8,
             order_label = np.zeros(ROI_sz * ROI_sz - 1)  # 8,
             order_label[diff == 2] = 1.  # center occludes neighbor
-            if interpolate:
-                # use connect4 label to gen connect8 label
+            if interpolate:  # use connect4 label to gen connect8 label
                 order_label[diff == 2] = 1.
                 order_label[0] = order_label[1] * order_label[3]
                 order_label[2] = order_label[1] * order_label[4]
@@ -426,10 +415,9 @@ def occ_order_connect4_to_ori_tensor(occ_order):
 
 def occ_order_to_edge(occ_order, connectivity=4):
     """
-    convert pairwise occ order to foreground/background occ edge
+    convert pairwise occ order to Figure/Ground notion and occ edge
     :param occ_order: pix occ order with its neighbor pixs: H,W,9
     :param connectivity: 4 or 8, neighborhood type
-    :return: binary occlusion contour map
     """
     H, W, _ = occ_order.shape
     occ_edge    = np.zeros((H, W))  # all possible occ edge
@@ -527,8 +515,7 @@ def insect_line_plane_3d(I0, I1, P0, n, epsilon=1e-6):
     if abs(dot) > epsilon:
         d = np.dot(n, (P0 - I0)) / dot
         P = I0 + I * d  # intersection point
-    else:
-        # The line is parallel to plane, totally inside or outside
+    else:  # The line is parallel to plane, totally inside or outside
         P = None
     return P
 
@@ -631,12 +618,10 @@ def depth_point2plane(depth, fx, fy):
 # ================================ functions for label conversion in train/val ======================================= #
 def occ_order_pred_to_edge_prob(occ_order, connectivity=4):
     """
-    edge-wise occ order prediction to pixel-wise occ edge probability(currently connectivity-4)
+    edge-wise occ order prediction to pixel-wise occ edge probability
     :param occ_order: occ order prediction; N,C,H,W ; tensor
     :return: N,1,H,W ; [0.~1.]
     """
-    N, C, H, W = occ_order.shape
-
     # softmax
     occ_order_E_prob_edgewise = F.softmax(occ_order[:, 0:3, :, :], dim=1)  # N,1,H,W
     occ_order_S_prob_edgewise = F.softmax(occ_order[:, 3:6, :, :], dim=1)  # N,1,H,W
@@ -739,12 +724,15 @@ def order4_to_order_pixelwise(occ_edge_prob, occ_order_E, occ_order_S):
     occ_order_pix = torch.zeros((H, W, 9))
 
     occ_order_pix[:, :, 0] = occ_edge_prob[:, :] * 127  # [-1~1] => [-127~127]
-    # v direction
+
+    # N,S direction
     occ_order_pix[1:, :, 2] = -occ_order_S[:-1, :]
     occ_order_pix[:, :, 7] = occ_order_S[:, :]
-    # h direction
+
+    # W,E direction
     occ_order_pix[:, 1:, 4] = -occ_order_E[:, :-1]
     occ_order_pix[:, :, 5] = occ_order_E[:, :]
+
     # other directions
     occ_order_pix[:, :, 1] = torch.clamp(occ_order_pix[:, :, 2] + occ_order_pix[:, :, 4], -1, 1)
     occ_order_pix[:, :, 3] = torch.clamp(occ_order_pix[:, :, 2] + occ_order_pix[:, :, 5], -1, 1)
@@ -778,11 +766,11 @@ def order8_to_order_pixelwise(occ_edge_prob, occ_order_E, occ_order_S, occ_order
     occ_order_pix = torch.zeros((H, W, 9))
     occ_order_pix[:, :, 0] = occ_edge_prob[:, :] * 127
 
-    # W,E direction
+    # N,S direction
     occ_order_pix[1:, :, 2] = -occ_order_S[:-1, :]
     occ_order_pix[:, :, 7] = occ_order_S[:, :]
 
-    # N,S direction
+    # W,E direction
     occ_order_pix[:, 1:, 4] = -occ_order_E[:, :-1]
     occ_order_pix[:, :, 5] = occ_order_E[:, :]
 
