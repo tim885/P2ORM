@@ -43,10 +43,10 @@ class MetricsEvaluator(object):
             self.mF1_SE = AverageMeter()
             self.mF1_NE = AverageMeter()
 
-            self.perf_E  = PixLabelEvaluator(config.dataset.NUM_CLASSES_H, config.TEST.class_sel_ind)
-            self.perf_S  = PixLabelEvaluator(config.dataset.NUM_CLASSES_V, config.TEST.class_sel_ind)
-            self.perf_SE = PixLabelEvaluator(config.dataset.NUM_CLASSES_H, config.TEST.class_sel_ind)
-            self.perf_NE = PixLabelEvaluator(config.dataset.NUM_CLASSES_V, config.TEST.class_sel_ind)
+            self.perf_E  = PixLabelEvaluator(3, config.TEST.class_sel_ind)
+            self.perf_S  = PixLabelEvaluator(3, config.TEST.class_sel_ind)
+            self.perf_SE = PixLabelEvaluator(3, config.TEST.class_sel_ind)
+            self.perf_NE = PixLabelEvaluator(3, config.TEST.class_sel_ind)
 
             self.curr_mIoU_E  = 0.
             self.curr_mIoU_S  = 0.
