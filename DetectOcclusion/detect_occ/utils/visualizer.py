@@ -78,13 +78,9 @@ def viz_and_log(inputs, net_out, targets, viz_writers, idx, epoch, config):
     :param targets: tuple, (N,H,W ; N,H,W)
     """
     # viz model input
-    if config.dataset.input == 'depth':
-        depth = inputs[0, :, :, :].cpu()
-        model_in_vis = depth / depth.max()  # => [0~1]
-    else:
-        mean_values = torch.tensor(config.dataset.pixel_means, dtype=inputs.dtype).view(3, 1, 1)
-        std_values = torch.tensor(config.dataset.pixel_stds, dtype=inputs.dtype).view(3, 1, 1)
-        model_in_vis = inputs[0, :3, :, :].cpu() * std_values + mean_values  # =>[0, 1]
+    mean_values = torch.tensor(config.dataset.pixel_means, dtype=inputs.dtype).view(3, 1, 1)
+    std_values = torch.tensor(config.dataset.pixel_stds, dtype=inputs.dtype).view(3, 1, 1)
+    model_in_vis = inputs[0, :3, :, :].cpu() * std_values + mean_values  # =>[0, 1]
     H, W = model_in_vis.shape[-2:]
     viz_writers[idx].add_image('Input', model_in_vis, epoch)
 
@@ -96,7 +92,6 @@ def viz_and_log(inputs, net_out, targets, viz_writers, idx, epoch, config):
         order_gt_S = targets[1][0, :, :].view(-1, H, W).cpu()
         _, ind_pred_h = net_out[0, :3, :, :].topk(1, dim=0, largest=True, sorted=True)  # 1,H,W
         _, ind_pred_v = net_out[0, 3:6, :, :].topk(1, dim=0, largest=True, sorted=True)
-
         if config.dataset.connectivity == 8:
             order_gt_SE = targets[2][0, :, :].view(-1, H, W).cpu()  # 1,H,W
             order_gt_NE = targets[3][0, :, :].view(-1, H, W).cpu()
@@ -111,7 +106,6 @@ def viz_and_log(inputs, net_out, targets, viz_writers, idx, epoch, config):
         viz_writers[idx].add_image('occ_order_S.1.gt', order_gt_S.float() / 2, epoch)
         viz_writers[idx].add_image('occ_order_E.2.pred', ind_pred_h.float() / 2, epoch)
         viz_writers[idx].add_image('occ_order_S.2.pred', ind_pred_v.float() / 2, epoch)
-
         if config.dataset.connectivity == 8:
             viz_writers[idx].add_image('occ_order_SE.1.gt', order_gt_SE.float() / 2, epoch)
             viz_writers[idx].add_image('occ_order_NE.1.gt', order_gt_NE.float() / 2, epoch)
@@ -146,23 +140,15 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
     root_eval_dir = os.path.join(out_dir, 'test_{}_{}'.format(epoch, valset_name))
     lbl_eval_dir = os.path.join(root_eval_dir, 'res_mat')
     img_eval_dir = os.path.join(root_eval_dir, 'images')
-    if config.dataset.save_w_rel_dir:  # keep rel dir structure as in csv
-        proj_dir = '/home/xuchong/Projects/occ_edge_order/'
-        rel_dir = img_abs_path[0].replace(proj_dir, '').replace(file_name, '')
-        img_eval_dir = os.path.join(img_eval_dir, rel_dir)
     if not os.path.exists(root_eval_dir): os.makedirs(root_eval_dir)
     if not os.path.exists(lbl_eval_dir): os.makedirs(lbl_eval_dir)
     if not os.path.exists(img_eval_dir): os.makedirs(img_eval_dir)
 
     # get original img
-    if config.dataset.input == 'depth':
-        depth = net_in[0, 0, :, :].cpu().numpy().astype(np.float32)
-        img_in_viz = depth / depth.max()  # => [0~1]
-    else:
-        mean_values = torch.tensor(config.dataset.pixel_means, dtype=net_in.dtype).view(3, 1, 1)
-        std_values  = torch.tensor(config.dataset.pixel_stds, dtype=net_in.dtype).view(3, 1, 1)
-        img_in_viz = net_in[0, :3, :, :].cpu() * std_values + mean_values
-        img_in_viz = np.transpose(img_in_viz.numpy(), (1, 2, 0)).astype(np.float32)  # 3,H,W => H,W,3
+    mean_values = torch.tensor(config.dataset.pixel_means, dtype=net_in.dtype).view(3, 1, 1)
+    std_values  = torch.tensor(config.dataset.pixel_stds, dtype=net_in.dtype).view(3, 1, 1)
+    img_in_viz = net_in[0, :3, :, :].cpu() * std_values + mean_values
+    img_in_viz = np.transpose(img_in_viz.numpy(), (1, 2, 0)).astype(np.float32)  # 3,H,W => H,W,3
     H, W = img_in_viz.shape[:2]
 
     if config.network.task_type == 'occ_order':
@@ -200,10 +186,8 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
             Image.fromarray((ind_pred_SE / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_SE4eval_path)
             Image.fromarray((ind_pred_NE / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_NE4eval_path)
 
-        # save pred occ order npy
+        # save pred occ order npy before NMS
         occ_order_eval_dir = os.path.join(lbl_eval_dir, 'test_order_pred')
-        if config.dataset.save_w_rel_dir:
-            occ_order_eval_dir = os.path.join(occ_order_eval_dir, rel_dir)
         if not os.path.exists(occ_order_eval_dir): os.makedirs(occ_order_eval_dir)
         occ_order_pred_path = os.path.join(occ_order_eval_dir, '{}-order-pix.npy'.format(img_name))
         np.save(occ_order_pred_path, occ_order_pred)
@@ -319,13 +303,13 @@ class MATLAB:
         self.out_order_dir = os.path.join(self.out_root_dir, 'test_order_pred')
 
         if 'nyu' in valset_name:
-            self.org_gt_dir = '/home/xuchong/ssd/Projects/Synthetic2Realistic/data/dataset_real/NYUv2/label/val_occ_order_raycasting_1mm_woNormal_avgROI'
+            self.org_gt_dir = '/home/xuchong/Projects/P2ORM/DetectOcclusion/data/NYUv2_OR/label/val_occ_order_raycasting_1mm_woNormal_avgROI'
             self.gt_type = '.mat'
         elif 'BSDSownership' in valset_name:
-            self.org_gt_dir = '/home/xuchong/ssd/Projects/Synthetic2Realistic/data/BSDS300/BSDS_theta/testOri_mat'
+            self.org_gt_dir = '/home/xuchong/Projects/P2ORM/DetectOcclusion/data/BSDS300/BSDS_theta/testOri_mat'
             self.gt_type = '.mat'
         elif 'ibims' in valset_name or 'interiornet' in valset_name:
-            self.org_gt_dir = '/home/xuchong/ssd/Projects/Synthetic2Realistic/data/dataset_real/ibims/label/ibims1_core_raw_raycasting_DynPixDepth_min25mm_angularE0005'
+            self.org_gt_dir = '/home/xuchong/Projects/P2ORM/DetectOcclusion/data/iBims1_OR/label/ibims1_core_raw_raycasting_DynPixDepth_min25mm_angularE0005'
             self.gt_type = '.mat'
 
         if not os.path.exists(self.out_root_dir): os.makedirs(self.out_root_dir)

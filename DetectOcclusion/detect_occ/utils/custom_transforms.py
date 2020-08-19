@@ -93,7 +93,8 @@ class ToTensor(object):
         labels = sample['label']
 
         if isinstance(img, np.ndarray):
-            img = img.astype(np.float32)  # C,H,W
+            # img = img.astype(np.float32)  # C,H,W
+            img = img.astype(np.float32).transpose((2, 0, 1))  # H,W,C => C,H,W
         else:  # PIL image
             img = np.array(img).astype(np.float32).transpose((2, 0, 1))  # H,W,C => C,H,W
         if img.ndim == 2:

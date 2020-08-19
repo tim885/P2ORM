@@ -9,9 +9,9 @@ dataset:
   connectivity: 8
   root_path: "/home/xuchong/ssd/Projects/P2ORM/DetectOcclusion/data"
   test_dataset: BSDSownership
-  train_image_set: 'data/BSDS300/image_sets/bsds300_train.txt'
-  val_image_set: 'data/BSDS300/image_sets/bsds300_val.txt'
-  test_image_set: 'data/BSDS300/image_sets/bsds300_val.txt'
+  train_image_set: 'data/BSDS300/image_sets/BSDSownership_train.txt'
+  val_image_set: 'data/BSDS300/image_sets/BSDSownership_val.txt'
+  test_image_set: 'data/BSDS300/image_sets/BSDSownership_val.txt'
   val_w_mat_gt: True
   rand_blur_rate: 0.5  # random image blurring rate
   pixel_means:  # imagenet data means and stds
