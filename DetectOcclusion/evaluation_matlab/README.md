@@ -15,8 +15,14 @@ There are two main interfaces:
    ...
    ...                you can see the other variables in EvaluateOcc.m
    ```
+   ```shell
+   # evaluate on metrics
+   cd evaluation/
+   matlab -nodisplay
+   run EvaluateOcc.m
+   ```
+   The orientation occlusion estimation metrics are showed under 'Orientation PR'. 
    
-   Cd evaluation/ and run EvaluateOcc.m. The orientation occlusion estimation metrics are showed under 'Orientation PR'. 
    The occlusion probability maps after NMS are stored in dir opt.method_folder/test_epoch_dataset/images/.
 
 *  `OccCompCurvesPlot.m`
@@ -27,13 +33,19 @@ There are two main interfaces:
    nms         N x 1 cell, each element is algorithm name which will be present at legend
    export_dir  the directory that you want to save the plots
    ```
+   ```shell
+   # plot performance curves
+   cd evaluation/
+   matlab -nodisplay 
+   run OccCompCurvesPlot.m
+   ```
+   Figures are stored in export_dir in the code.
    
-   Cd evaluation/ and run OccCompCurvesPlot.m. Figures are stored in export_dir in the code.
    N.B. It's recommended to run under matlab command mode (matlab -nodisplay) to avoid possible matlab crash. 
 
 # Visualization
 
-The visualization script supports 7 type figures: original image, ground truth boundary map, ground truth occlution orientation map, ground truth occlution boundary map with arrow, and corresponding prediction map.
+The visualization script supports 3 type figures: original image, ground truth oriented occlusion boundary map with arrow and corresponding prediction map.
 
 *  `PlotAll.m` is the main point. You need to set following variables:
    ```
@@ -42,10 +54,15 @@ The visualization script supports 7 type figures: original image, ground truth b
    res_mat_dir        the prediction directory, which contans .mat files
    export_dir         the directory that you want to save the print eps figure
    test_ids_filename  the relative or absolute path of test ids file. 
-
    ```
-
-   Cd visualization/ and run PlotAll.m. Figures are stored in export_dir in the code.
+   ```shell 
+   # plot figures
+   cd visualization/ 
+   matlab -nodisplay
+   run PlotAll.m.
+   ``` 
+   Figures are stored in export_dir in the code.
+   
    N.B. It's recommended to run under matlab command mode (matlab -nodisplay) to avoid possible matlab crash. 
 
 

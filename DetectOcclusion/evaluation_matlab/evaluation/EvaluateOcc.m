@@ -5,7 +5,7 @@ tic;
 curr_path = mfilename('fullpath');
 
 DataSet = 'BSDSownership';
-opt.method_folder = '2020-01-15_15-40-52/results_vis';
+opt.method_folder = 'BSDSownership_pretrained/results_vis';
 which_epochs = {19};
 
 %DataSet = 'ibims';

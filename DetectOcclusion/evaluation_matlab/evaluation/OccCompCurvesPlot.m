@@ -5,7 +5,7 @@ addpath(genpath('../export_fig'));
 clear;
 
 DataSet = 'BSDSownership';
-method_folder = '2020-01-15_15-40-52/results_vis';
+method_folder = 'BSDSownership_pretrained/results_vis';
 export_dir = fullfile(pwd, '..', '..', 'experiments', 'output', method_folder, 'test_19_BSDSownership/res_mat/test_pred/eval_curves');
         
 algs = {fullfile(pwd, '..', '..', 'experiments', 'output', method_folder, 'test_19_BSDSownership/res_mat/test_pred'),...

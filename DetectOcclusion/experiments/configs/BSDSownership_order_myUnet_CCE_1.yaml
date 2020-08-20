@@ -53,7 +53,7 @@ TRAIN:
   warmup: False
   warmup_lr: 0.00001
   warmup_step: 200
-  lr: 0.00005
+  lr: 0.0001
   begin_epoch: 0
   end_epoch: 20
   milestones:  # epochs at which learning rate is divided by a factor

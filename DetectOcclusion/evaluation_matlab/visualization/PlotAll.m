@@ -4,7 +4,7 @@ addpath('../common');
 addpath('edge_link');
 
 DataSet = 'BSDSownership';
-exp_name = '2020-01-15_15-40-52';
+exp_name = 'BSDSownership_pretrained';
 method_folder = [exp_name '/results_vis'];
 which_epoch = '19';
 
