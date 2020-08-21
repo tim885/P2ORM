@@ -46,20 +46,22 @@ We recommend to utilize conda environment to install all dependencies and test t
 git clone 'https://github.com/tim885/P2ORM'
 cd P2ORM
 
-# Create python env with relevant packages
+# Create python env with relevant dependencies
 conda create --name P2ORM --file spec-file.txt
-source activate P2ORM
+conda activate P2ORM
+/your_conda_root/envs/P2ORM/bin/pip install tensorboardX
 ```
 
 ### 2.2 Data preparation
-#### 2.2.1 Download BSDSownership dataset
 Download BSDS300.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYcz1vGKyyA3IVTnwQ?e=qqxpxP) and unzip it in folder data/.
 
+Download iBims_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc35UQ1F3_bKdmyHw?e=hVlniI) and unzip it in folder data/.
 ## 3. Evaluation
 ### 3.1 Pixel-Pair Occlusion Detection
 #### 3.1.1 Pretrained models
-Download pretrained model on BSDSownership [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc2NQVqKwBmiCROag?e=x5Emnn)
+Download pretrained model for BSDSownership [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc2NQVqKwBmiCROag?e=x5Emnn).
 
+Download pretrained model for iBims1_OR [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc4xePVHPNDytq2ew?e=AC74sN). 
 #### 3.1.2 Test and evaluation
 ```shell
 # create data dir symbole link for occlusion detection and exp dir 
@@ -70,12 +72,29 @@ mkdir DetectOcclusion/output/  && cd detect_occ/
 mkdir DetectOcclusion/output/BSDSownership_pretrained/  # and put pretrained model here
 python train_val.py --config ../experiments/configs/BSDSownership_order_myUnet_CCE_1.yaml --evaluate --resume BSDSownership_pretrained/BSDSownership_epoch19.pth.tar --gpus 0
 
+# test on iBims1_OR dataset
+mkdir DetectOcclusion/output/iBims1OR_pretrained/  # and put pretrained model here
+python train_val.py --config ../experiments/configs/ibims_order_myUnet_CCE_1.yaml --evaluate --resume iBims1OR_pretrained/iBims1OR_epoch179.pth.tar --gpus 0
+
 # do non-maximum suppression on predictions and evaluate (default: BSDSownership)
 # please refer to evaluation_matlab/README.md for more details
 cd ../evaluation_matlab/evaluation/
 matlab -nodisplay
-run EvaluateOcc.m   
+run EvaluateOcc.m
+
+# gen pairwise occlusion after NMS in exp_dir for downstream task (default: BSDSownership)
+cd ../../utils/ && python gen_nms_occ_order.py
 ```
+
+We also offer pairwise occlusion predictions for downstream task directly:
+
+Download pairwise occlusion prediction for iBims-1 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc6W5sbtS7YBi5M3Q?e=fIoGuo).
+
+Download pairwise occlusion prediction for NYUv2 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc7R_AMWp9OLTrIJg?e=xJc57C).
+
+
+N.B. Each .npy file contains one channel of occlusion boundary probability (-127~127) and eight channels of occlusion relationship 
+w.r.t each pixel's eight neighbor pixels with label (1: occludes, -1: occluded, 0: no occlusion).   
 
 ## 4. Train
 ### 4.1 Pixel-Pair Occlusion Detection

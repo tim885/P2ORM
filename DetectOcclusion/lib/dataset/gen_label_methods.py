@@ -746,13 +746,13 @@ def order4_to_order_pixelwise(occ_edge_prob, occ_order_E, occ_order_S):
 
 def order8_to_order_pixelwise(occ_edge_prob, occ_order_E, occ_order_S, occ_order_SE, occ_order_NE):
     """
-    convert connectivity-8 occ order prediction to occ order label H,W,9 for downstream tasks
+    convert connectivity-8 pairwise occ order prediction to pixel-wise occ order label H,W,9 for downstream tasks
     :param occ_edge_prob: H,W ; [0~1] ; tensor
     :param occ_order_E: 1,H,W ; [0,1,2]
     :param occ_order_S: 1,H,W ; [0,1,2]
     :param occ_order_SE: 1,H,W ; [0,1,2]
     :param occ_order_NE: 1,H,W ; [0,1,2]
-    :return: occ_order_pix; H,W,9
+    :return: occ_order_pix; H,W,9 ; occ_edge_prob + occ_order along 8 neighbor directions ('occlude':1,'occluded':-1,'no occ':0)
     """
     occ_edge_prob = occ_edge_prob.squeeze()
     H, W = occ_edge_prob.shape

@@ -68,10 +68,11 @@ def main():
     global args, curr_path, best_perf
     print('Called with argument:', args)
 
-    if args.out_dir: # specify out dir
-        output_path = os.path.join(config.output_path, args.out_dir)
+    config.root_path = os.path.join(curr_path, '..')
+    if args.out_dir:  # specify out dir
+        output_path = os.path.join(config.root_path, config.output_path, args.out_dir)
     else:
-        output_path = config.output_path
+        output_path = os.path.join(config.root_path, config.output_path)
 
     # logger
     curr_time = time.strftime("%Y-%m-%d_%H-%M-%S", time.gmtime())
@@ -120,24 +121,6 @@ def main():
     cudnn.benchmark = False  # True if fixed train/val input size
     print('=> cudnn.deterministic flag:', cudnn.deterministic)
 
-    # create dataloader
-    train_csv = os.path.join(curr_path, '..', config.dataset.train_image_set)
-    val_csv   = os.path.join(curr_path, '..', config.dataset.val_image_set)
-    test_csv  = os.path.join(curr_path, '..', config.dataset.test_image_set)
-    print_and_log("=> train_image_set: {}\n=> val_image_set: {}"
-                  .format(config.dataset.train_image_set, config.dataset.val_image_set), logger)
-
-    train_input_transf, train_co_transf, val_co_transf = get_data_transforms(config)
-    train_dataset = ImgToOccDataset(train_csv, config, False, train_input_transf, None, train_co_transf)
-    val_dataset = ImgToOccDataset(val_csv, config, True, None, None, val_co_transf)
-
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=config.TRAIN.batch_size,
-                                               num_workers=args.workers, pin_memory=True, shuffle=config.TRAIN.shuffle)
-    val_loader   = torch.utils.data.DataLoader(val_dataset, batch_size=config.TEST.batch_size,
-                                               num_workers=args.workers, pin_memory=True, shuffle=False)
-    print_and_log('=> {} samples found, {} train samples and {} validation samples'
-                  .format(len(val_dataset) + len(train_dataset), len(train_dataset), len(val_dataset)), logger)
-
     criterion = get_criterion(config, args)  # define loss functions(criterion)
 
     # define optimizer and lr scheduler
@@ -150,9 +133,9 @@ def main():
                                     weight_decay=config.TRAIN.weight_decay, nesterov=config.TRAIN.nesterov)
 
     if args.resume:  # optionally resume from a checkpoint with trained model or train from scratch
-        model_path = os.path.join(config.output_path, args.resume)
+        model_path = os.path.join(output_path, args.resume)
         if os.path.isfile(model_path):
-            print("=> loading resumed model '{}'".format(args.resume))
+            print("=> loading resumed model '{}'".format(model_path))
             resumed_model = torch.load(model_path, map_location=lambda storage, loc: storage.cuda(args.gpus[0]))
             model.load_state_dict(resumed_model['state_dict'])
             optimizer.load_state_dict(resumed_model['optimizer'])
@@ -178,7 +161,9 @@ def main():
     # --------------------------------- test on test set from resumed model ------------------------------------------ #
     if args.evaluate:
         print_and_log('=> evaluation mode', logger)
-        test_dataset = ImgToOccDataset(test_csv, config, True, None, None, val_co_transf)
+        test_csv = os.path.join(curr_path, '..', config.dataset.test_image_set)
+        _, _, test_co_transf = get_data_transforms(config)
+        test_dataset = ImgToOccDataset(test_csv, config, True, None, None, test_co_transf)
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, num_workers=args.workers,
                                                   pin_memory=True, shuffle=False)
         print_and_log('=> {} test samples'.format(len(test_dataset)), logger)
@@ -209,6 +194,24 @@ def main():
 
         return
     # ---------------------------------------------------------------------------------------------------------------- #
+
+    # create dataloaders for train/val
+    train_csv = os.path.join(curr_path, '..', config.dataset.train_image_set)
+    val_csv = os.path.join(curr_path, '..', config.dataset.val_image_set)
+    print_and_log("=> train_image_set: {}\n=> val_image_set: {}"
+                  .format(config.dataset.train_image_set, config.dataset.val_image_set), logger)
+
+    train_input_transf, train_co_transf, val_co_transf = get_data_transforms(config)
+    train_dataset = ImgToOccDataset(train_csv, config, False, train_input_transf, None, train_co_transf)
+    val_dataset = ImgToOccDataset(val_csv, config, True, None, None, val_co_transf)
+
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=config.TRAIN.batch_size,
+                                               num_workers=args.workers, pin_memory=True,
+                                               shuffle=config.TRAIN.shuffle)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=config.TEST.batch_size,
+                                             num_workers=args.workers, pin_memory=True, shuffle=False)
+    print_and_log('=> {} samples found, {} train samples and {} validation samples'
+                  .format(len(val_dataset) + len(train_dataset), len(train_dataset), len(val_dataset)), logger)
 
     # ----------------------------------------------- training loop -------------------------------------------------- #
     val_step = config.TRAIN.val_step  # val every step epochs

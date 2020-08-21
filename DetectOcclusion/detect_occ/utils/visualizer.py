@@ -18,6 +18,7 @@ sys.path.append('../..')
 from lib.dataset.gen_label_methods import order4_to_order_pixelwise, order8_to_order_pixelwise, occ_order_pred_to_edge_prob, occ_order_pred_to_ori
 
 PI = 3.1416
+curr_path = os.path.abspath(os.path.dirname(__file__))
 
 
 def plot_train_metrics(train_writer, config, epoch, train_loss, train_mIoUs, train_mF1s, train_AP_edge):
@@ -303,13 +304,13 @@ class MATLAB:
         self.out_order_dir = os.path.join(self.out_root_dir, 'test_order_pred')
 
         if 'nyu' in valset_name:
-            self.org_gt_dir = '/home/xuchong/Projects/P2ORM/DetectOcclusion/data/NYUv2_OR/label/val_occ_order_raycasting_1mm_woNormal_avgROI'
+            self.org_gt_dir = os.path.join(curr_path, '../..', 'data/NYUv2_OR/label/val_occ_order_raycasting_1mm_woNormal_avgROI')
             self.gt_type = '.mat'
         elif 'BSDSownership' in valset_name:
-            self.org_gt_dir = '/home/xuchong/Projects/P2ORM/DetectOcclusion/data/BSDS300/BSDS_theta/testOri_mat'
+            self.org_gt_dir = os.path.join(curr_path, '../..', 'data/BSDS300/BSDS_theta/testOri_mat')
             self.gt_type = '.mat'
         elif 'ibims' in valset_name or 'interiornet' in valset_name:
-            self.org_gt_dir = '/home/xuchong/Projects/P2ORM/DetectOcclusion/data/iBims1_OR/label/ibims1_core_raw_raycasting_DynPixDepth_min25mm_angularE0005'
+            self.org_gt_dir = os.path.join(curr_path, '../..', 'data/iBims1_OR/label/ibims1_core_raw_raycasting_DynPixDepth_min25mm_angularE0005')
             self.gt_type = '.mat'
 
         if not os.path.exists(self.out_root_dir): os.makedirs(self.out_root_dir)
