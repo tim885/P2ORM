@@ -1,0 +1,78 @@
+---
+pytorch_version: "1.1"
+output_path: "experiments/output/"
+default:
+  frequent: 20
+
+dataset:
+  connectivity: 8
+  test_dataset: BSDSownership
+  train_image_set: 'data/BSDS300/image_sets/BSDSownership_train.txt'
+  val_image_set: 'data/BSDS300/image_sets/BSDSownership_val.txt'
+  test_image_set: 'data/BSDS300/image_sets/BSDSownership_val.txt'
+  val_w_mat_gt: True
+  rand_blur_rate: 0.5  # random image blurring rate
+  pixel_means:  # imagenet data means and stds
+    - 0.485
+    - 0.456
+    - 0.406
+  pixel_stds:
+    - 0.229
+    - 0.224
+    - 0.225
+  base_size: 480  # base size for random scale crop
+  crop_size: 320  # random square crop size
+  fill_label: 1  # occ order class label for label map padding
+
+network:
+  arch: 'myResUnet'
+  task_type: 'occ_order'
+  model_prefix: ""
+  pretrained: True
+  pretrained_path: ""
+  pretrained_epoch: 0
+  scale_down: 16
+  in_channels: 3
+
+TRAIN:
+  batch_size: 8
+  shuffle: True
+  optimizer: 'adam'
+
+  momentum: 0.975  # for sgd
+  weight_decay: 0.0005
+  bias_decay: 0
+  nesterov: True
+
+  betas:  # for adam
+    - 0.975
+    - 0.999
+
+  warmup: False
+  warmup_lr: 0.00001
+  warmup_step: 200
+  lr: 0.0001
+  begin_epoch: 0
+  end_epoch: 20
+  milestones:  # epochs at which learning rate is divided by a factor
+    - 10
+
+  val_metric: 'mIoU'
+  val_step: 1
+  test_step: 5
+  loss: 'CrossEntropyLoss'
+  class_weights:  # CE class-balance weights
+    - 10.0
+    - 1.0
+    - 10.0
+  mask_is_edge: False
+  spatial_weighting:
+    - 1.0
+    - 5.0
+
+TEST:
+  img_padding: False
+  batch_size: 1
+  class_sel_ind:  # selected classes for eval metric
+    - 0
+    - 2
