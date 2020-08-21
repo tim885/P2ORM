@@ -1,4 +1,9 @@
-data
+
+# dirs
 .idea
+
+DetectOcclusion/experiments/output
+DetectOcclusion/data
+
+# file types
 *.pyc
-experiments/output
