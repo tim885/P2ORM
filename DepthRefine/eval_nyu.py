@@ -10,9 +10,9 @@ from skimage import feature
 from scipy import ndimage
 from tqdm import tqdm
 import cv2
-import gc
 
 eigen_crop = [21, 461, 25, 617]
+
 
 def init_device(cuda_device):
     os.environ['CUDA_VISIBLE_DEVICES'] = str(cuda_device)
@@ -59,9 +59,9 @@ def load_datasets(nyu_gt_path, nyu_splits_path, depth_refine_path):
     out_preds = dict()
     for method in tqdm(['laina', 'sharpnet', 'eigen', 'jiao', 'dorn', 'bts', 'vnl'], desc='loading depth maps'):
         # load our depth maps saved in npy files
-        pred_dir = os.path.join(depth_refine_path, method, 'depth_npy')
+        pred_dir = os.path.join(depth_refine_path, method)
         pred = []
-        for file_name in sorted(os.listdir(pred_dir)):
+        for file_name in sorted([name for name in os.listdir(pred_dir) if name.endswith('.npy')]):
             pred.append(np.load(os.path.join(pred_dir, file_name)))
         pred = np.array(pred)
 
@@ -220,19 +220,19 @@ def eval_depth_and_boundaries(out_preds, out_index, nyu_test_gt, nyu_test_rgb, b
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--nyu_gt_path', dest='nyu_gt_path', default='/space_sdd/NYU/nyu_depth_v2_labeled.mat', type=str)
-    parser.add_argument('--nyu_splits_path', dest='nyu_splits_path', default='/space_sdd/NYU/nyuv2_splits.mat', type=str)
+    parser.add_argument('--input', default='result/nyu', type=str)
 
-    parser.add_argument('input', default='/space_sdd/NYU/depth_refine/session_0', type=str)
+    parser.add_argument('--nyu_gt_path', dest='nyu_gt_path', default='../data/NYUv2_OR/nyu_depth_v2_labeled.mat', type=str)
+    parser.add_argument('--nyu_splits_path', dest='nyu_splits_path', default='../data/NYUv2_OR/nyuv2_splits.mat', type=str)
 
-    parser.add_argument('--boundaries_path', dest='boundaries_path', default='/space_sdd/NYU/depth_predictions/NYUv2_OCpp/', type=str)
-    parser.add_argument('--boundaries_list', dest='boundaries_list', default='/space_sdd/NYU/depth_predictions/NYUv2_OCpp/boundaries_list.txt', type=str)
+    parser.add_argument('--boundaries_path', dest='boundaries_path', default='../data/NYUv2_OR/NYUv2_OCpp/', type=str)
+    parser.add_argument('--boundaries_list', dest='boundaries_list', default='../data/NYUv2_OR/NYUv2_OCpp/boundaries_list.txt', type=str)
     args = parser.parse_args()
-    nyu_test_gt, nyu_test_rgb, out_preds, index_dict = load_datasets(args.nyu_gt_path, args.nyu_splits_path,
-                                                                     args.input)
+
+    nyu_test_gt, nyu_test_rgb, out_preds, index_dict = load_datasets(args.nyu_gt_path, args.nyu_splits_path, args.input)
     out_index, boundaries_gt = load_boundaries(index_dict, args.boundaries_list, args.boundaries_path)
     print('Data loaded')
     print('Results will be saved at {}'.format(os.path.realpath(args.input)))
-    eval_log_path = os.path.join(os.path.realpath(args.input), 'results.txt')
+    eval_log_path = os.path.join(os.path.realpath(args.input), 'eval.txt')
     eval_log = open(eval_log_path, 'a')
     eval_depth_and_boundaries(out_preds, out_index, nyu_test_gt, nyu_test_rgb, boundaries_gt, eval_log)
