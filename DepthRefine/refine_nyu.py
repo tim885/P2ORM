@@ -1,12 +1,7 @@
 import argparse
 import os
 import numpy as np
-import pickle as pkl
-import h5py
-from scipy.io import loadmat
 from tqdm import tqdm
-import cv2
-import gc
 
 import matplotlib
 matplotlib.use('agg')  # use matplotlib without GUI support
@@ -17,108 +12,25 @@ import torch.optim as optim
 
 from lib.models.unet import UNet
 from lib.utils.net_utils import load_checkpoint
-from lib.utils.data_utils import padding_array
+from lib.utils.data_utils import padding_array, read_jiao, read_laina, read_sharpnet, read_eigen, read_dorn, read_bts, read_vnl
+
 
 # =================PARAMETERS=============================== #
 parser = argparse.ArgumentParser()
 
 # network settings
 parser.add_argument('--checkpoint', type=str, default=None, help='optional reload model path')
-
+parser.add_argument('--thresh', type=float, default=0.7, help='threshold value used to remove unconfident occlusions')
 parser.add_argument('--use_occ', type=bool, default=True, help='whether to use occlusion as network input')
 parser.add_argument('--lr', type=float, default=0.0001, help='learning rate of optimizer')
 
 # pth settings
 parser.add_argument('--result_dir', type=str, default='result/nyu')
 parser.add_argument('--occ_dir', type=str, default='../data/NYUv2_OR/pred_occ')
+parser.add_argument('--depth_dir', type=str, default='../data/NYUv2_OR/pred_depth')
 
 opt = parser.parse_args()
 print(opt)
-# ========================================================== #
-
-
-# =================CREATE DATASET=========================== #
-eigen_crop = [21, 461, 25, 617]
-
-
-def read_jiao():
-    ours = []
-    jiao_pred_path = '../data/NYUv2_OR/pred_depth/jiao_pred_mat/'
-    for i in range(654):
-        f = loadmat(jiao_pred_path + str(i+1) + '.mat')
-        f = f['pred']
-        f = f[eigen_crop[0]:eigen_crop[1], eigen_crop[2]:eigen_crop[3]]
-        ours.append(f)
-    ours = np.array(ours)
-    return ours
-
-
-def read_laina():
-    laina_pred = h5py.File('../data/NYUv2_OR/pred_depth/laina_predictions_NYUval.mat', 'r')['predictions']
-    laina_pred = np.array(laina_pred).transpose((0, 2, 1))
-    laina_pred = laina_pred[:, eigen_crop[0]:eigen_crop[1], eigen_crop[2]:eigen_crop[3]]
-    return laina_pred
-
-
-def read_sharpnet():
-    with open('../data/NYUv2_OR/pred_depth/sharpnet_prediction.pkl', 'rb') as f:
-        ours = pkl.load(f)
-    ours = np.array(ours)
-    ours = ours[:, eigen_crop[0]:eigen_crop[1], eigen_crop[2]:eigen_crop[3]]
-    return ours
-
-
-def read_eigen():
-    ours = loadmat('../data/NYUv2_OR/pred_depth/eigen_nyud_depth_predictions.mat')
-    ours = ours['fine_predictions']
-    ours = ours.transpose((2, 0, 1))
-    out = []
-    for line in ours:
-        line = cv2.resize(line, (592, 440))
-        out.append(line)
-    out = np.array(out)
-    return out
-
-
-def read_dorn():
-    ours = []
-    list_dirs = open('../data/NYUv2_OR/pred_depth/NYUV2_DORN/list_dorn_order.txt', 'r').readlines()
-    for line in list_dirs:
-        line = line.strip()
-        f = loadmat('../data/NYUv2_OR/pred_depth/NYUV2_DORN/NYUV2_DORN/' + line)
-        pred = f['pred'][eigen_crop[0]:eigen_crop[1], eigen_crop[2]:eigen_crop[3]]
-        ours.append(pred)
-    ours = np.array(ours)
-    return ours
-
-
-def read_bts():
-    ours = []
-    list_dirs = open('../data/NYUv2_OR/pred_depth/result_bts_nyu/pred_bts.txt', 'r').readlines()
-    tmp_dict = dict()
-    for line in list_dirs:
-        line = line.strip()
-        num_tmp = line.rfind('_')
-        key = int(line[num_tmp+1:-4])
-        f = cv2.imread('../data/NYUv2_OR/pred_depth/result_bts_nyu/raw/' + line, -1)
-        f = f / 1000
-        pred = f[eigen_crop[0]:eigen_crop[1], eigen_crop[2]:eigen_crop[3]]
-        tmp_dict[key] = pred
-    keys = list(tmp_dict.keys())
-    keys.sort()
-    for key in keys:
-        ours.append(tmp_dict[key])
-    del tmp_dict
-    gc.collect()
-    ours = np.array(ours)
-    return ours
-
-
-def read_vnl():
-    ours = pkl.load(open('../data/NYUv2_OR/pred_depth/pred_VNL.pkl', 'rb'))
-    ours = np.array(ours) * 10
-    ours = ours[:, eigen_crop[0]:eigen_crop[1], eigen_crop[2]:eigen_crop[3]]
-    return ours
 # ========================================================== #
 
 
@@ -135,6 +47,9 @@ net.eval()
 # load in occlusion list
 occ_list = sorted([name for name in os.listdir(opt.occ_dir) if name.endswith(".npz")])
 
+# set the crop window defined in NYUv2 dataset
+eigen_crop = [21, 461, 25, 617]
+
 
 for method in tqdm(['jiao', 'laina', 'sharpnet', 'eigen', 'dorn', 'bts', 'vnl']):
     # create result dir
@@ -144,7 +59,7 @@ for method in tqdm(['jiao', 'laina', 'sharpnet', 'eigen', 'dorn', 'bts', 'vnl'])
 
     # read in depths
     func = eval('read_{}'.format(method))
-    depths_ori = func()
+    depths_ori = func(opt.depth_dir)
     # padding the cropped depth prediction to 480x640
     depths = np.zeros((depths_ori.shape[0], 480, 640))
     depths[:, eigen_crop[0]:eigen_crop[1], eigen_crop[2]:eigen_crop[3]] = depths_ori
@@ -157,10 +72,10 @@ for method in tqdm(['jiao', 'laina', 'sharpnet', 'eigen', 'dorn', 'bts', 'vnl'])
             depth_coarse = depths[i].unsqueeze(0).cuda()
 
             # load predicted occlusion map
-            occlusion = np.load(os.path.join(opt.occ_dir, occ_list[i]))['order'].astype('float')
+            occlusion = np.load(os.path.join(opt.occ_dir, occ_list[i]))['order']
 
             # remove predictions with small score
-            mask = occlusion[:, :, 0] <= 0.5 * 128
+            mask = occlusion[:, :, 0] <= opt.thresh * 127
             occlusion[mask, 1:] = 0
             occlusion = padding_array(occlusion).unsqueeze(0).cuda()
             
