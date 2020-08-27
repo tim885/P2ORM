@@ -222,11 +222,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', default='result/nyu', type=str)
 
-    parser.add_argument('--nyu_gt_path', dest='nyu_gt_path', default='../data/NYUv2_OR/nyu_depth_v2_labeled.mat', type=str)
-    parser.add_argument('--nyu_splits_path', dest='nyu_splits_path', default='../data/NYUv2_OR/nyuv2_splits.mat', type=str)
+    parser.add_argument('--nyu_gt_path', default='../data/NYUv2_OR/nyu_depth_v2_labeled.mat', type=str)
+    parser.add_argument('--nyu_splits_path', default='../data/NYUv2_OR/nyuv2_splits.mat', type=str)
 
-    parser.add_argument('--boundaries_path', dest='boundaries_path', default='../data/NYUv2_OR/NYUv2_OCpp/', type=str)
-    parser.add_argument('--boundaries_list', dest='boundaries_list', default='../data/NYUv2_OR/NYUv2_OCpp/boundaries_list.txt', type=str)
+    parser.add_argument('--boundaries_path', default='../data/NYUv2_OR/NYUv2_OCpp/', type=str)
+    parser.add_argument('--boundaries_list', default='../data/NYUv2_OR/NYUv2_OCpp/boundaries_list.txt', type=str)
     args = parser.parse_args()
 
     nyu_test_gt, nyu_test_rgb, out_preds, index_dict = load_datasets(args.nyu_gt_path, args.nyu_splits_path, args.input)

@@ -2,18 +2,16 @@ import os
 from os.path import join
 import torch
 import numpy as np
-import cv2
 from scipy import io
 
 import torch.utils.data as data
 
 
 class Ibims(data.Dataset):
-    def __init__(self, root_dir, method_name, occ_dir, occ_ext, th=None):
+    def __init__(self, root_dir, method_name, occ_dir, th=None):
         super(Ibims, self).__init__()
         self.root_dir = root_dir
         self.occ_dir = occ_dir
-        self.occ_ext = occ_ext
         self.method_name = method_name
         self.th = th
         with open(join(self.root_dir, 'imagelist.txt')) as f:
@@ -40,12 +38,12 @@ class Ibims(data.Dataset):
         depth_gt, depth_pred, edge = self._load_depths_from_mat(depth_gt_mat, depth_pred_mat)
 
         # fetch occlusion orientation maps
-        occ_path = join(self.root_dir, self.occ_dir, self.im_names[index] + self.occ_ext)
+        occ_path = join(self.root_dir, self.occ_dir, self.im_names[index] + '-rgb-order-pix.npz')
         occ = np.load(occ_path)['order']
 
         # remove predictions with small score
         if self.th is not None:
-            mask = occ[:, :, 0] <= self.th * 128
+            mask = occ[:, :, 0] <= self.th * 127
             occ[mask, 1:] = 0
 
         return depth_gt, depth_pred, occ, edge

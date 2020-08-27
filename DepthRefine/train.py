@@ -32,7 +32,7 @@ parser.add_argument('--print_freq', type=int, default=50, help='frequence of out
 parser.add_argument('--resume', action='store_true', help='resume checkpoint or not')
 parser.add_argument('--checkpoint', type=str, default=None, help='optional reload model path')
 parser.add_argument('--save_dir', type=str, default='save_model', help='save model path')
-parser.add_argument('--dataset_dir', type=str, default='../data/InteriorNet_OR', help='training dataset')
+parser.add_argument('--dataset_dir', type=str, default='../data/InteriorNet_OR/data', help='training dataset')
 
 opt = parser.parse_args()
 print(opt)
