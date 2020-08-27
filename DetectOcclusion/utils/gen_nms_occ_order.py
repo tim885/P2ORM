@@ -17,9 +17,9 @@ sys.path.append('..')
 from lib.dataset.gen_label_methods import viz_occ_order
 
 curr_dir = os.path.abspath(os.path.dirname(__file__))
-dataset = 'BSDSownership'
+dataset = 'nyuv2'
 
-res_root_dir = os.path.join(curr_dir, '..', 'experiments/output/BSDSownership_pretrained/results_vis/test_19_{}'.format(dataset))
+res_root_dir = os.path.join(curr_dir, '..', 'experiments/output/NYUv2OR_pretrained/results_vis/test_74_{}'.format(dataset))
 res_img_dir  = os.path.join(res_root_dir, 'images')
 res_order_dir     = os.path.join(res_root_dir, 'res_mat', 'test_order_pred')
 res_order_nms_dir = os.path.join(res_root_dir, 'res_mat', 'test_order_nms_pred')
@@ -35,7 +35,7 @@ elif dataset == 'BSDSownership':
 with open(testIds_path) as f:
     test_ids = f.readlines() 
 
-check_order = True  # viz occ order
+check_order = False  # viz occ order
 prob_thresh = 0.5  # mask out occ edge region below threshold
 for idx, big_idx in enumerate(tqdm(test_ids)):
     big_idx = big_idx.replace('\n', '')
@@ -44,7 +44,7 @@ for idx, big_idx in enumerate(tqdm(test_ids)):
     rgb_in_path    = os.path.join(res_img_dir, '{}_img_v.png'.format(big_idx))
     prob_in_path   = os.path.join(res_img_dir, '{}_lab_v_g_nms.png'.format(big_idx))
     order_in_path  = os.path.join(res_order_dir, '{}-order-pix.npy'.format(big_idx))
-    order_out_path = os.path.join(res_order_nms_dir, '{}-order-pix.npy'.format(big_idx))
+    order_out_path = os.path.join(res_order_nms_dir, '{}-order-pix.npz'.format(big_idx))
     viz_out_path   = os.path.join(res_order_nms_dir, '{}-order-viz.png'.format(big_idx))
     order_out_name = order_out_path.split('/')[-1]
     order_out_dir  = order_out_path.replace(order_out_name, '')
@@ -58,8 +58,8 @@ for idx, big_idx in enumerate(tqdm(test_ids)):
 
     no_occ = (prob_nms <= prob_thresh)
     occ_order_nms[no_occ, 1:] = 0  # filter out non-occ region by thresholding
-    occ_order_nms[:, :, 0] = (prob_nms * 2 - 1) * 127  # [0~1] => [-127~127]
-    np.save(order_out_path, occ_order_nms.astype(np.int8))
+    occ_order_nms[:, :, 0] = prob_nms * 127  # [0~1] => [0~127]
+    np.savez_compressed(order_out_path, order=occ_order_nms.astype(np.int8))
 
     if check_order:
         bgr = cv2.imread(rgb_in_path, cv2.IMREAD_UNCHANGED)  # uint8

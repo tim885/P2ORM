@@ -41,7 +41,7 @@ class ImgToOccDataset(data.Dataset):
         else:
             occ_edge_lbl  = cv2.imread(occ_edge_lbl_path, cv2.IMREAD_UNCHANGED) / 255  # H,W; {0, 1}
             occ_ori_lbl   = cv2.imread(occ_ori_lbl_path, cv2.IMREAD_UNCHANGED) / 255  # H,W; {0, 1}
-            occ_order_lbl = np.load(occ_order_lbl_path)  # H,W,9; {-1,0,1}
+            occ_order_lbl = np.load(occ_order_lbl_path)['order']  # H,W,9; {-1,0,1}
 
         # make net load size as multiplier of minSize
         if self.isTest:
