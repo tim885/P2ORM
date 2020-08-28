@@ -1,7 +1,7 @@
 # P2ORM: Formulation, Inference & Application 
 This repository contains the official Pytorch implementation of our paper: "Pixel-Pair Occlusion Relationship Map (P2ORM): Formulation, Inference & Application" (ECCV 2020 Spotlight). 
 
-[[Project page]](http://imagine.enpc.fr/~qiux/P2ORM/)
+[[Project page]](http://imagine.enpc.fr/~qiux/P2ORM/) [[Paper]](http://imagine.enpc.fr/~qiux/P2ORM/) [[Supp.]](http://imagine.enpc.fr/~qiux/P2ORM/supp.pdf)
 
 <p align="center">
 <img src="https://github.com/tim885/P2ORM/blob/master/img/overview.PNG" width="800px" alt="teaser">
@@ -109,7 +109,7 @@ Download pairwise occlusion prediction for NYUv2 [here](https://1drv.ms/u/s!AhUx
 N.B. Each .npz file contains one channel for occlusion boundary probability (0~127) and eight channels of occlusion relationship 
 w.r.t each pixel's eight neighbor pixels with label (1: occludes, -1: occluded, 0: no occlusion). Please load using:    
 ```shell
-occ = numpy.load('file_path')['order']
+occ = numpy.load(file_path)['order']
 ```
 
 ### 3.2 Depth Refinement with Detected Occlusion
@@ -159,7 +159,7 @@ The initial depth maps are predicted by:
 cd DetectOcclusion/ && ln -s ../data/ data/
 mkdir DetectOcclusion/output/ && cd detect_occ/
 
-# train on BSDSownership dataset
+# train for BSDSownership dataset
 python train_val.py --config ../experiments/configs/BSDSownership_order_myUnet_CCE_1.yaml --gpus 1   
 
 # train for iBims1_OR dataset
