@@ -114,7 +114,9 @@ occ = numpy.load('file_path')['order']
 
 ### 3.2 Depth Refinement with Detected Occlusion
 
-Pretrained model is saved at ``./DepthRefine/pretrained/ckpt.pth``.
+Change to the directory: ``cd ./DepthRefine/``.
+
+Pretrained model is saved at ``pretrained/ckpt.pth``.
 
 To refine the depth map on iBims1_OR:
 ```
@@ -143,7 +145,7 @@ The initial depth maps are predicted by:
  **\[
 [eigen](https://arxiv.org/abs/1406.2283),
 [laina](https://arxiv.org/abs/1606.00373), 
-[dorn](https://arxiv.org/abs/1806.02446),  
+[dorn](https://arxiv.org/abs/1806.02446),
 [sharpnet](https://arxiv.org/abs/1905.08598),
 [jiao](https://openaccess.thecvf.com/content_ECCV_2018/papers/Jianbo_Jiao_Look_Deeper_into_ECCV_2018_paper.pdf),
 [vnl](https://arxiv.org/abs/1907.12209)
@@ -170,7 +172,8 @@ python train_val.py --config ../experiments/configs/nyuv2_order_myUnet_CCE_1.yam
 ### 4.2 Depth Refinement
 
 Our model is trained on 10,160 images of InteriorNet_OR for 30 epochs:
-```shell
+```
+cd ./DepthRefine/
 python train.py --save_dir #save_model_path
 ```
 The whole training procedure can be finished in ~10 hours with a single TitanX GPU.
