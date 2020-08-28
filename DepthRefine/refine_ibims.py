@@ -20,19 +20,17 @@ from lib.utils.evaluate_ibims_error_metrics import compute_global_errors, \
 # =================PARAMETERS=============================== #
 parser = argparse.ArgumentParser()
 
-# network training procedure settings
+# network settings
+parser.add_argument('--checkpoint', type=str, default=None, help='optional reload model path')
+parser.add_argument('--thresh', type=float, default=0.7, help='threshold value used to remove unconfident occlusions')
 parser.add_argument('--use_occ', type=bool, default=True, help='whether to use occlusion as network input')
 parser.add_argument('--lr', type=float, default=0.0001, help='learning rate of optimizer')
 
-# io pth settings
-parser.add_argument('--checkpoint', type=str, default=None, help='optional reload model path')
+# pth settings
 parser.add_argument('--result_dir', type=str, default='result/ibims', help='result folder')
-
-# dataset settings
 parser.add_argument('--data_dir', type=str, default='../data/iBims1_OR', help='testing dataset')
 parser.add_argument('--depth_pred_method', type=str, default='junli')
 parser.add_argument('--occ_dir', type=str, default='pred_occ')
-parser.add_argument('--occ_ext', type=str, default='-rgb-order-pix.npz')
 
 opt = parser.parse_args()
 print(opt)
@@ -40,7 +38,7 @@ print(opt)
 
 
 # =================CREATE DATASET=========================== #
-dataset_val = Ibims(opt.data_dir, opt.depth_pred_method, opt.occ_dir, opt.occ_ext, th=0.5)
+dataset_val = Ibims(opt.data_dir, opt.depth_pred_method, opt.occ_dir, th=opt.thresh)
 val_loader = DataLoader(dataset_val, batch_size=1, shuffle=False)
 
 with open(os.path.join(opt.data_dir, 'imagelist.txt')) as f:

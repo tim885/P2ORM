@@ -1,5 +1,9 @@
 This is the matlab script code for oriented occlusion boundary detection task on BSDSownership/NYUv2-OR/iBims-1 dataset and tests successfuly on Matlab2016b. You can use it to evaluate and visulize the oriented occlusion boundary detection results. The code is originally developed by Guoxia Wang and Peng Wang and offered in https://github.com/GuoxiaWang/DOOBNet/tree/master/doobscripts. 
 
+# installation
+
+Unzip the evaluation_code.zip in this directory.  
+
 # Evaluation
 
 There are two main interfaces:

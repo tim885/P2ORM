@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=1 python train.py --epoch 30 --lr 1e-5 --batch_size 8

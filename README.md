@@ -53,15 +53,25 @@ conda activate P2ORM
 ```
 
 ### 2.2 Data preparation
-Download BSDS300.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYcz1vGKyyA3IVTnwQ?e=qqxpxP) and unzip it in folder data/.
+Download relevant dataset and unzip it in folder data/.  
 
-Download iBims_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc35UQ1F3_bKdmyHw?e=hVlniI) and unzip it in folder data/.
+Download BSDS300.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdv3gqnp2iElQ_9iw?e=Ni7Idb).
+
+Download InteriorNet_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYd1UPeUgMxXbi766Q?e=tK0fbD).
+
+Download iBims1_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdzBIOqzgHsVvP8VQ?e=gUMk53).
+
+Download NYUv2_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYd0JZ-NwwPjuhbmZA?e=mnCPog).
+
 ## 3. Evaluation
 ### 3.1 Pixel-Pair Occlusion Detection
 #### 3.1.1 Pretrained models
 Download pretrained model for BSDSownership [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc2NQVqKwBmiCROag?e=x5Emnn).
 
-Download pretrained model for iBims1_OR [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc4xePVHPNDytq2ew?e=AC74sN). 
+Download pretrained model for iBims1_OR [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc4xePVHPNDytq2ew?e=AC74sN).
+
+Download pretrained model for NYUv2_OR [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdwlHOPtVS_CgwXdg?e=vOlT3V). 
+
 #### 3.1.2 Test and evaluation
 ```shell
 # create data dir symbole link for occlusion detection and exp dir 
@@ -76,6 +86,10 @@ python train_val.py --config ../experiments/configs/BSDSownership_order_myUnet_C
 mkdir DetectOcclusion/output/iBims1OR_pretrained/  # and put pretrained model here
 python train_val.py --config ../experiments/configs/ibims_order_myUnet_CCE_1.yaml --evaluate --resume iBims1OR_pretrained/iBims1OR_epoch179.pth.tar --gpus 0
 
+# test on NYUv2_OR dataset
+mkdir DetectOcclusion/output/NYUv2OR_pretrained/  # and put pretrained model here
+python train_val.py --config ../experiments/configs/nyuv2_order_myUnet_CCE_1.yaml --evaluate --resume NYUv2OR_pretrained/NYUv2OR_epoch74.pth.tar --gpus 0
+
 # do non-maximum suppression on predictions and evaluate (default: BSDSownership)
 # please refer to evaluation_matlab/README.md for more details
 cd ../evaluation_matlab/evaluation/
@@ -88,13 +102,15 @@ cd ../../utils/ && python gen_nms_occ_order.py
 
 We also offer pairwise occlusion predictions for downstream task directly:
 
-Download pairwise occlusion prediction for iBims-1 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc6W5sbtS7YBi5M3Q?e=fIoGuo).
+Download pairwise occlusion prediction for iBims-1 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdxC6qiKGoHKXB0Lg?e=eUPsYS).
 
-Download pairwise occlusion prediction for NYUv2 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYc7R_AMWp9OLTrIJg?e=xJc57C).
+Download pairwise occlusion prediction for NYUv2 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdyMeuvdCZyKE5OWw?e=Gann3f).
 
-
-N.B. Each .npy file contains one channel of occlusion boundary probability (-127~127) and eight channels of occlusion relationship 
-w.r.t each pixel's eight neighbor pixels with label (1: occludes, -1: occluded, 0: no occlusion).   
+N.B. Each .npz file contains one channel for occlusion boundary probability (0~127) and eight channels of occlusion relationship 
+w.r.t each pixel's eight neighbor pixels with label (1: occludes, -1: occluded, 0: no occlusion). Please load using:    
+```shell
+occ = numpy.load('file_path')['order']
+```
 
 ## 4. Train
 ### 4.1 Pixel-Pair Occlusion Detection
@@ -105,4 +121,10 @@ mkdir DetectOcclusion/output/ && cd detect_occ/
 
 # train on BSDSownership dataset
 python train_val.py --config ../experiments/configs/BSDSownership_order_myUnet_CCE_1.yaml --gpus 1   
+
+# train for iBims1_OR dataset
+python train_val.py --config ../experiments/configs/ibims_order_myUnet_CCE_1.yaml --gpus 1
+
+# train for NYUv2_OR dataset
+python train_val.py --config ../experiments/configs/nyuv2_order_myUnet_CCE_1.yaml --gpus 1
 ```
