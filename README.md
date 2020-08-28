@@ -57,11 +57,11 @@ Download relevant dataset and unzip it in folder data/.
 
 Download BSDS300.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdv3gqnp2iElQ_9iw?e=Ni7Idb).
 
-Download InteriorNet_OR.zip [here]().
+Download InteriorNet_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYd1UPeUgMxXbi766Q?e=tK0fbD).
 
 Download iBims1_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdzBIOqzgHsVvP8VQ?e=gUMk53).
 
-Download NYUv2_OR.zip [here]().
+Download NYUv2_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYd0JZ-NwwPjuhbmZA?e=mnCPog).
 
 ## 3. Evaluation
 ### 3.1 Pixel-Pair Occlusion Detection
