@@ -4,7 +4,6 @@ import numpy as np
 import sys
 import argparse
 import h5py
-import pickle as pkl
 from scipy.io import loadmat
 from skimage import feature
 from scipy import ndimage
@@ -29,35 +28,23 @@ def init_device(cuda_device):
 def load_datasets(nyu_gt_path, nyu_splits_path, depth_refine_path):
     nyu = h5py.File(nyu_gt_path, 'r')
     nyu_splits = loadmat(nyu_splits_path)
-    imgs = nyu['images']
     depths = nyu['depths']
     index_dict = dict()
     nyu_test_gt = []
-    nyu_test_rgb = []
     count = 0
     eigen_crop = [21, 461, 25, 617]
-    img_mean = np.array([0.485, 0.456, 0.406])
-    img_mean = img_mean.reshape((1, 1, 3))
-    img_std = np.array([0.229, 0.224, 0.225])
-    img_std = img_std.reshape((1, 1, 3))
-    for i in tqdm(nyu_splits['testNdxs'], desc='loading images'):
+    for i in tqdm(nyu_splits['testNdxs'], desc='loading GT depth maps'):
         index = i[0]-1
         index_dict[i[0]] = count
         count += 1
         label = depths[index]
         label = label.transpose(1, 0)
         label = label[eigen_crop[0]:eigen_crop[1], eigen_crop[2]:eigen_crop[3]]
-        img = np.array(imgs[index], dtype=np.float32)
-        img = img.transpose(2, 1, 0)
-        img = img[eigen_crop[0]:eigen_crop[1], eigen_crop[2]:eigen_crop[3]]
-        img = (img / 255. - img_mean) / img_std
         nyu_test_gt.append(label)
-        nyu_test_rgb.append(img)
     nyu_test_gt = np.array(nyu_test_gt)
-    nyu_test_rgb = np.array(nyu_test_rgb)
 
     out_preds = dict()
-    for method in tqdm(['laina', 'sharpnet', 'eigen', 'jiao', 'dorn', 'bts', 'vnl'], desc='loading depth maps'):
+    for method in tqdm(['eigen', 'laina', 'dorn', 'sharpnet', 'jiao', 'vnl'], desc='loading pred depth maps'):
         # load our depth maps saved in npy files
         pred_dir = os.path.join(depth_refine_path, method)
         pred = []
@@ -70,7 +57,7 @@ def load_datasets(nyu_gt_path, nyu_splits_path, depth_refine_path):
 
         out_preds['{}_pred'.format(method)] = pred
 
-    return nyu_test_gt, nyu_test_rgb, out_preds, index_dict
+    return nyu_test_gt, out_preds, index_dict
 
 
 def compute_errors(gt, pred):
@@ -164,10 +151,10 @@ def compute_depth_boundary_error(edges_gt, pred, low_thresh=0.15, high_thresh=0.
             res = ch1 + ch2  # summed distances
             dbe_com = np.nansum(res) / (np.nansum(edges_est) + np.nansum(edges_gt))  # normalized
 
-    return dbe_acc, dbe_com #, edges_est, D_est
+    return dbe_acc, dbe_com
 
 
-def eval_depth_and_boundaries(out_preds, out_index, nyu_test_gt, nyu_test_rgb, boundaries_gt_, eval_log):
+def eval_depth_and_boundaries(out_preds, out_index, nyu_test_gt, boundaries_gt_, eval_log):
     for key in tqdm(out_preds.keys(), desc='evaluating results'):
         ours = out_preds[key]
         pred_refine = []
@@ -175,24 +162,12 @@ def eval_depth_and_boundaries(out_preds, out_index, nyu_test_gt, nyu_test_rgb, b
         score_edge = np.zeros(2)
         for index in range(len(ours)):
             our_depth = ours[index]
-            our_rgb = nyu_test_rgb[index]
             target_size = [440, 592]
             input_size = [480, 640]
             our_depth = cv2.resize(our_depth, (input_size[1], input_size[0]))
-            our_rgb = cv2.resize(our_rgb, (input_size[1], input_size[0]))
             out_depth = our_depth
             out_depth = cv2.resize(out_depth, (target_size[1], target_size[0]))
             pred_refine.append(out_depth)
-            show = False
-            if show:
-                import matplotlib.pyplot as plt
-                plt.figure()
-                plt.imshow(out_depth)
-                plt.figure()
-                plt.imshow(nyu_test_gt[index])
-                plt.figure()
-                plt.imshow(our_depth)
-                plt.show()
             result = compute_errors(out_depth, nyu_test_gt[index])
             score += np.array(result)
         pred_refine = np.array(pred_refine)
@@ -209,7 +184,6 @@ def eval_depth_and_boundaries(out_preds, out_index, nyu_test_gt, nyu_test_rgb, b
         print('=========================')
         for i in score:
             print(i / len(ours))
-        pred_refine = np.array(pred_refine)
         for i in score_edge:
             print(i / len(pred_edge_input))
         print('*************************')
@@ -220,7 +194,7 @@ def eval_depth_and_boundaries(out_preds, out_index, nyu_test_gt, nyu_test_rgb, b
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', default='result/nyu', type=str)
+    parser.add_argument('input', default='result/nyu', type=str)
 
     parser.add_argument('--nyu_gt_path', default='../data/NYUv2_OR/nyu_depth_v2_labeled.mat', type=str)
     parser.add_argument('--nyu_splits_path', default='../data/NYUv2_OR/nyuv2_splits.mat', type=str)
@@ -229,10 +203,10 @@ if __name__ == '__main__':
     parser.add_argument('--boundaries_list', default='../data/NYUv2_OR/NYUv2_OCpp/boundaries_list.txt', type=str)
     args = parser.parse_args()
 
-    nyu_test_gt, nyu_test_rgb, out_preds, index_dict = load_datasets(args.nyu_gt_path, args.nyu_splits_path, args.input)
+    nyu_test_gt, out_preds, index_dict = load_datasets(args.nyu_gt_path, args.nyu_splits_path, args.input)
     out_index, boundaries_gt = load_boundaries(index_dict, args.boundaries_list, args.boundaries_path)
     print('Data loaded')
     print('Results will be saved at {}'.format(os.path.realpath(args.input)))
     eval_log_path = os.path.join(os.path.realpath(args.input), 'eval.txt')
     eval_log = open(eval_log_path, 'a')
-    eval_depth_and_boundaries(out_preds, out_index, nyu_test_gt, nyu_test_rgb, boundaries_gt, eval_log)
+    eval_depth_and_boundaries(out_preds, out_index, nyu_test_gt, boundaries_gt, eval_log)

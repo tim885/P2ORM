@@ -26,7 +26,7 @@ parser.add_argument('--lr', type=float, default=1e-5, help='learning rate of opt
 parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
 parser.add_argument('--workers', type=int, help='number of data loading workers', default=4)
 parser.add_argument('--epoch', type=int, default=30, help='number of epochs to train for')
-parser.add_argument('--print_freq', type=int, default=50, help='frequence of output print')
+parser.add_argument('--print_freq', type=int, default=100, help='frequency of output print')
 
 # pth settings
 parser.add_argument('--resume', action='store_true', help='resume checkpoint or not')
@@ -50,15 +50,15 @@ train_loader = DataLoader(dataset_train,
 net = UNet(use_occ=opt.use_occ)
 net.apply(kaiming_init)
 weights_normal_init(net.output_layer, 0.001)
+net.cuda()
 
 optimizer = optim.Adam(net.parameters(), lr=opt.lr)
 
 if opt.resume:
-    start_epoch = load_checkpoint(net, optimizer, opt.checkpoint)
+    start_epoch = load_checkpoint(net, optimizer, opt.checkpoint) + 1
 else:
     start_epoch = 1
 
-net.cuda()
 gamma = create_gamma_matrix(480, 640, 600, 600)
 gamma = torch.from_numpy(gamma).float().cuda()
 # ========================================================== #

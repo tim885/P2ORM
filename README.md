@@ -112,6 +112,44 @@ w.r.t each pixel's eight neighbor pixels with label (1: occludes, -1: occluded, 
 occ = numpy.load('file_path')['order']
 ```
 
+### 3.2 Depth Refinement with Detected Occlusion
+
+Pretrained model is saved at ``./DepthRefine/pretrained/ckpt.pth``.
+
+To refine the depth map on iBims1_OR:
+```
+python refine_ibims.py --checkpoint #model_path --depth_pred_method #method_name
+```
+where the initial depth maps are predicted by **#method_name**, 
+which should be chosen from: 
+**\[
+[eigen](https://arxiv.org/abs/1406.2283),
+[fcrn](https://arxiv.org/abs/1606.00373), 
+[fayao](https://arxiv.org/abs/1411.6387), 
+[junli](https://arxiv.org/abs/1607.00730), 
+[planenet](https://arxiv.org/abs/1804.06278), 
+[sharpnet](https://arxiv.org/abs/1905.08598)
+\]**.
+
+
+To refine and evaluate depth on NYUv2_OR:
+```
+python refine_nyu.py --checkpoint #model_path --result_dir #refined_depths
+python eval_nyu.py #refined_depths
+```
+the refined depths would be saved in **#refined_depths** and 
+evaluation results would be logged in file **#refined_depths/eval.txt**.
+The initial depth maps are predicted by:
+ **\[
+[eigen](https://arxiv.org/abs/1406.2283),
+[laina](https://arxiv.org/abs/1606.00373), 
+[dorn](https://arxiv.org/abs/1806.02446),  
+[sharpnet](https://arxiv.org/abs/1905.08598),
+[jiao](https://openaccess.thecvf.com/content_ECCV_2018/papers/Jianbo_Jiao_Look_Deeper_into_ECCV_2018_paper.pdf),
+[vnl](https://arxiv.org/abs/1907.12209)
+\]**.
+
+
 ## 4. Train
 ### 4.1 Pixel-Pair Occlusion Detection
 ```shell
@@ -128,3 +166,11 @@ python train_val.py --config ../experiments/configs/ibims_order_myUnet_CCE_1.yam
 # train for NYUv2_OR dataset
 python train_val.py --config ../experiments/configs/nyuv2_order_myUnet_CCE_1.yaml --gpus 1
 ```
+
+### 4.2 Depth Refinement
+
+Our model is trained on 10,160 images of InteriorNet_OR for 30 epochs:
+```shell
+python train.py --save_dir #save_model_path
+```
+The whole training procedure can be finished in ~10 hours with a single TitanX GPU.
