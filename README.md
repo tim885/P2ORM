@@ -106,9 +106,13 @@ Download pairwise occlusion prediction for iBims-1 [here](https://1drv.ms/u/s!Ah
 
 Download pairwise occlusion prediction for NYUv2 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdyMeuvdCZyKE5OWw?e=Gann3f).
 
-N.B. Each .npz file contains one channel for occlusion boundary probability (0~127) and eight channels of occlusion relationship 
-w.r.t each pixel's eight neighbor pixels with label (1: occludes, -1: occluded, 0: no occlusion). Please load using:    
+N.B. Each .npz file contains the first channel for occlusion boundary probability (0~127) and next eight channels of occlusion relationship
+w.r.t each pixel's eight neighbor pixels with label (1: occludes, -1: occluded, 0: no occlusion). The mapping from index to pixel neighbor is:<br/>
+1 2 3<br/>
+4 &nbsp;&nbsp; 5<br/>
+6 7 8<br/>
 ```shell
+# Please load using:
 occ = numpy.load('file_path')['order']
 ```
 
