@@ -23,7 +23,7 @@ dataset:
   base_size: 480  # base image size for random scale
   crop_size: 320  # crop image size
   fill_label: 1  # class label for occ order label padding
-  val_w_mat_gt: False
+  val_w_mat_gt: True
 network:
   arch: 'myResUnet'
   task_type: 'occ_order'
