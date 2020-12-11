@@ -1,7 +1,7 @@
 # P2ORM: Formulation, Inference & Application 
-This repository contains the official Pytorch implementation of our paper: "Pixel-Pair Occlusion Relationship Map (P2ORM): Formulation, Inference & Application" (ECCV 2020 Spotlight). 
+This repository contains the official Pytorch implementation of our paper: "Pixel-Pair Occlusion Relationship Map (P2ORM): Formulation, Inference & Application" (ECCV 2020 Spotlight). For more details such as videos and introduction slides, please refer to our project webpage.    
 
-[[Project page]](http://imagine.enpc.fr/~qiux/P2ORM/) [[Paper]](https://arxiv.org/pdf/2007.12088.pdf) [[Supp.]](http://imagine.enpc.fr/~qiux/P2ORM/supp.pdf)
+[[Project webpage]](http://imagine.enpc.fr/~qiux/P2ORM/) [[Paper]](https://arxiv.org/pdf/2007.12088.pdf) [[Supp.]](http://imagine.enpc.fr/~qiux/P2ORM/supp.pdf)
 
 <p align="center">
 <img src="https://github.com/tim885/P2ORM/blob/master/img/overview.PNG" width="800px" alt="teaser">
