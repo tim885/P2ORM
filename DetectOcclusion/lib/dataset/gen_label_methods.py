@@ -385,7 +385,7 @@ def occ_order_connect8_to_ori(occ_order_pix):
     return theta_tangent
 
 
-def occ_order_connect4_to_ori_tensor(occ_order):
+def occ_order_connect4_to_occ_ori(occ_order):
     """
     pairwise occ order to pixel-wise occ ori for checking, following occ ori convention(currently only connectivity-4)
     used to gen occ ori dataset
