@@ -76,3 +76,4 @@ TEST:
   class_sel_ind:  # selected classes for eval metric
     - 0
     - 2
+  out_nms_res: False

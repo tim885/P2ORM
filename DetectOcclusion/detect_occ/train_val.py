@@ -352,7 +352,7 @@ def val_epoch(val_loader, model, criterion, epoch, output_writers, logger, res_p
     with torch.no_grad():
         end = time.time()
 
-        for batch_idx, (inputs, targets, img_path) in enumerate(val_loader):
+        for batch_idx, (inputs, targets, img_path) in enumerate(tqdm(val_loader)):
             data_time.update(time.time() - end)
 
             # load data

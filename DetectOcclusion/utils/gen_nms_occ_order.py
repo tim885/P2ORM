@@ -57,8 +57,8 @@ for idx, big_idx in enumerate(tqdm(test_ids)):
     occ_order_nms = occ_order.copy()
 
     no_occ = (prob_nms <= prob_thresh)
-    occ_order_nms[no_occ, 1:] = 0  # filter out non-occ region by thresholding
     occ_order_nms[:, :, 0] = prob_nms * 127  # [0~1] => [0~127]
+    occ_order_nms[no_occ, :] = 0  # filter out non-occ region pixels by thresholding
     np.savez_compressed(order_out_path, order=occ_order_nms.astype(np.int8))
 
     if check_order:
