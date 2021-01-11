@@ -636,32 +636,105 @@ def occ_order_pred_to_edge_prob(occ_order, connectivity=4):
 
     # average to get pixel-wise occ_edge_prob and pairwise occ_order_exist_prob along each inclination
     if connectivity == 4:
-        non_occ_prob = (non_occ_prob_E_edgewise + non_occ_prob_S_edgewise) / 2
-        occ_edge_prob = 1. - non_occ_prob
+        non_occ_order_probs = torch.cat((non_occ_prob_E_edgewise, non_occ_prob_S_edgewise), 1)  # N,2,H,W
+        occ_edge_prob = order_prob_to_edge_prob(non_occ_order_probs)
+        # non_occ_prob = (non_occ_prob_E_edgewise + non_occ_prob_S_edgewise) / 2
+        # occ_edge_prob = 1. - non_occ_prob
         occ_order_exist_prob = torch.cat((1 - non_occ_prob_E_edgewise, 1 - non_occ_prob_S_edgewise), 1)  # N,2,H,W
     elif connectivity == 8:
-        # padded pred prob
-        nonocc_pad_E  = nn.ConstantPad2d((1, 0, 0, 0), 1.)  # left, right, up, down ; no occ prob = 1.
-        nonocc_pad_S  = nn.ConstantPad2d((0, 0, 1, 0), 1.)  # left, right, up, down
-        nonocc_pad_SE = nn.ConstantPad2d((1, 0, 1, 0), 1.)  # left, right, up, down
-        nonocc_pad_NE = nn.ConstantPad2d((1, 0, 0, 1), 1.)  # left, right, up, down
+        non_occ_order_probs = torch.cat((non_occ_prob_E_edgewise, non_occ_prob_S_edgewise,
+                                         non_occ_prob_SE_edgewise, non_occ_prob_NE_edgewise), 1)  # N,4,H,W
+        occ_edge_prob = order_prob_to_edge_prob(non_occ_order_probs)
 
-        nonocc_pred_E_pad  = nonocc_pad_E(non_occ_prob_E_edgewise)  # N,1,H,W => N,1,H,W+1
-        nonocc_pred_S_pad  = nonocc_pad_S(non_occ_prob_S_edgewise)  # N,1,H,W => N,1,H+1,W
-        nonocc_pred_SE_pad = nonocc_pad_SE(non_occ_prob_SE_edgewise)  # N,1,H,W => N,1,H+1,W+1
-        nonocc_pred_NE_pad = nonocc_pad_NE(non_occ_prob_NE_edgewise)  # N,1,H,W => N,1,H+1,W+1
-
-        # average by 8 in connectivity-8
-        occ_prob_E  = 1 - (nonocc_pred_E_pad[:, :, :, :-1] + nonocc_pred_E_pad[:, :, :, 1:]) / 2  # N,1,H,W
-        occ_prob_S  = 1 - (nonocc_pred_S_pad[:, :, :-1, :] + nonocc_pred_S_pad[:, :, 1:, :]) / 2  # N,1,H,W
-        occ_prob_SE = 1 - (nonocc_pred_SE_pad[:, :, :-1, :-1] + nonocc_pred_SE_pad[:, :, 1:, 1:]) / 2  # N,1,H,W
-        occ_prob_NE = 1 - (nonocc_pred_NE_pad[:, :, 1:, :-1] + nonocc_pred_NE_pad[:, :, :-1, 1:]) / 2  # N,1,H,W
-
-        occ_edge_prob = (occ_prob_E + occ_prob_S + occ_prob_SE + occ_prob_NE) / 4
+        # # padded pred prob
+        # nonocc_pad_E  = nn.ConstantPad2d((1, 0, 0, 0), 1.)  # left, right, up, down ; no occ prob = 1.
+        # nonocc_pad_S  = nn.ConstantPad2d((0, 0, 1, 0), 1.)  # left, right, up, down
+        # nonocc_pad_SE = nn.ConstantPad2d((1, 0, 1, 0), 1.)  # left, right, up, down
+        # nonocc_pad_NE = nn.ConstantPad2d((1, 0, 0, 1), 1.)  # left, right, up, down
+        #
+        # nonocc_pred_E_pad  = nonocc_pad_E(non_occ_prob_E_edgewise)  # N,1,H,W => N,1,H,W+1
+        # nonocc_pred_S_pad  = nonocc_pad_S(non_occ_prob_S_edgewise)  # N,1,H,W => N,1,H+1,W
+        # nonocc_pred_SE_pad = nonocc_pad_SE(non_occ_prob_SE_edgewise)  # N,1,H,W => N,1,H+1,W+1
+        # nonocc_pred_NE_pad = nonocc_pad_NE(non_occ_prob_NE_edgewise)  # N,1,H,W => N,1,H+1,W+1
+        #
+        # # average by 8 in connectivity-8
+        # occ_prob_E  = 1 - (nonocc_pred_E_pad[:, :, :, :-1] + nonocc_pred_E_pad[:, :, :, 1:]) / 2  # N,1,H,W
+        # occ_prob_S  = 1 - (nonocc_pred_S_pad[:, :, :-1, :] + nonocc_pred_S_pad[:, :, 1:, :]) / 2  # N,1,H,W
+        # occ_prob_SE = 1 - (nonocc_pred_SE_pad[:, :, :-1, :-1] + nonocc_pred_SE_pad[:, :, 1:, 1:]) / 2  # N,1,H,W
+        # occ_prob_NE = 1 - (nonocc_pred_NE_pad[:, :, 1:, :-1] + nonocc_pred_NE_pad[:, :, :-1, 1:]) / 2  # N,1,H,W
+        #
+        # occ_edge_prob = (occ_prob_E + occ_prob_S + occ_prob_SE + occ_prob_NE) / 4  # N,1,H,W
         occ_order_exist_prob = torch.cat((1 - non_occ_prob_E_edgewise, 1 - non_occ_prob_S_edgewise,
                                           1 - non_occ_prob_SE_edgewise, 1 - non_occ_prob_NE_edgewise), 1)  # N,4,H,W
 
     return occ_edge_prob, occ_order_exist_prob
+
+
+def order_prob_to_edge_prob(nonocc_order_prob):
+    """
+    convert pairwise occ order prob to pixel-wise occ edge prob by average
+    :param nonocc_order_prob: occ order prob for non-occlusion; Nx2xHxW or Nx4xHxW; tensor
+    :return: Nx1xHxW
+    """
+    if nonocc_order_prob.shape[1] == 2:  # connectivity-4
+        non_occ_prob = (nonocc_order_prob[:, 0, :, :] + nonocc_order_prob[:, 1, :, :]) / 2
+        occ_edge_prob = 1. - non_occ_prob.unsqueeze(1)  # N,1,H,W
+    elif nonocc_order_prob.shape[1] == 4:  # connectivity-8
+        # padded pred prob
+        nonocc_pad_E = nn.ConstantPad2d((1, 0, 0, 0), 1.)  # left, right, up, down ; no occ prob = 1.
+        nonocc_pad_S = nn.ConstantPad2d((0, 0, 1, 0), 1.)  # left, right, up, down
+        nonocc_pad_SE = nn.ConstantPad2d((1, 0, 1, 0), 1.)  # left, right, up, down
+        nonocc_pad_NE = nn.ConstantPad2d((1, 0, 0, 1), 1.)  # left, right, up, down
+
+        nonocc_pred_E_pad = nonocc_pad_E(nonocc_order_prob[:, 0, :, :].unsqueeze(1))  # N,1,H,W => N,1,H,W+1
+        nonocc_pred_S_pad = nonocc_pad_S(nonocc_order_prob[:, 1, :, :].unsqueeze(1))  # N,1,H,W => N,1,H+1,W
+        nonocc_pred_SE_pad = nonocc_pad_SE(nonocc_order_prob[:, 2, :, :].unsqueeze(1))  # N,1,H,W => N,1,H+1,W+1
+        nonocc_pred_NE_pad = nonocc_pad_NE(nonocc_order_prob[:, 3, :, :].unsqueeze(1))  # N,1,H,W => N,1,H+1,W+1
+
+        # average by 8 in connectivity-8
+        occ_prob_E = 1 - (nonocc_pred_E_pad[:, :, :, :-1] + nonocc_pred_E_pad[:, :, :, 1:]) / 2  # N,1,H,W
+        occ_prob_S = 1 - (nonocc_pred_S_pad[:, :, :-1, :] + nonocc_pred_S_pad[:, :, 1:, :]) / 2  # N,1,H,W
+        occ_prob_SE = 1 - (nonocc_pred_SE_pad[:, :, :-1, :-1] + nonocc_pred_SE_pad[:, :, 1:, 1:]) / 2  # N,1,H,W
+        occ_prob_NE = 1 - (nonocc_pred_NE_pad[:, :, 1:, :-1] + nonocc_pred_NE_pad[:, :, :-1, 1:]) / 2  # N,1,H,W
+
+        occ_edge_prob = (occ_prob_E + occ_prob_S + occ_prob_SE + occ_prob_NE) / 4  # N,1,H,W
+
+    return occ_edge_prob
+
+
+def order_prob_to_edge_prob_argmax(nonocc_order_prob):
+    """
+    convert pairwise occ order prob to pixel-wise occ edge prob by max in connectivity 8
+    :param nonocc_order_prob: occ order prob for non-occlusion; Nx2xHxW or Nx4xHxW; tensor
+    :return: Nx1xHxW
+    """
+    N, C, H, W = nonocc_order_prob.shape
+    if nonocc_order_prob.shape[1] == 4:  # connectivity-8
+        # padded pred prob
+        nonocc_pad_E = nn.ConstantPad2d((1, 0, 0, 0), 1.)  # left, right, up, down ; no occ prob = 1.
+        nonocc_pad_S = nn.ConstantPad2d((0, 0, 1, 0), 1.)  # left, right, up, down
+        nonocc_pad_SE = nn.ConstantPad2d((1, 0, 1, 0), 1.)  # left, right, up, down
+        nonocc_pad_NE = nn.ConstantPad2d((1, 0, 0, 1), 1.)  # left, right, up, down
+
+        nonocc_pred_E_pad = nonocc_pad_E(nonocc_order_prob[:, 0, :, :].unsqueeze(1))  # N,1,H,W => N,1,H,W+1
+        nonocc_pred_S_pad = nonocc_pad_S(nonocc_order_prob[:, 1, :, :].unsqueeze(1))  # N,1,H,W => N,1,H+1,W
+        nonocc_pred_SE_pad = nonocc_pad_SE(nonocc_order_prob[:, 2, :, :].unsqueeze(1))  # N,1,H,W => N,1,H+1,W+1
+        nonocc_pred_NE_pad = nonocc_pad_NE(nonocc_order_prob[:, 3, :, :].unsqueeze(1))  # N,1,H,W => N,1,H+1,W+1
+
+        # max occ order prob as occ edge prob
+        nonocc_order_prob_pix = torch.zeros(N, 8, H, W)
+        nonocc_order_prob_pix[:, 0, :, :] = nonocc_pred_E_pad[:, :, :, :-1]
+        nonocc_order_prob_pix[:, 1, :, :] = nonocc_pred_E_pad[:, :, :, 1:]
+        nonocc_order_prob_pix[:, 2, :, :] = nonocc_pred_S_pad[:, :, :-1, :]
+        nonocc_order_prob_pix[:, 3, :, :] = nonocc_pred_S_pad[:, :, 1:, :]
+        nonocc_order_prob_pix[:, 4, :, :] = nonocc_pred_SE_pad[:, :, :-1, :-1]
+        nonocc_order_prob_pix[:, 5, :, :] = nonocc_pred_SE_pad[:, :, 1:, 1:]
+        nonocc_order_prob_pix[:, 6, :, :] = nonocc_pred_NE_pad[:, :, 1:, :-1]
+        nonocc_order_prob_pix[:, 7, :, :] = nonocc_pred_NE_pad[:, :, :-1, 1:]
+        nonocc_edge_prob, _ = torch.min(nonocc_order_prob_pix, dim=1, keepdim=True)  # N,1,H,W
+        occ_edge_prob = 1 - nonocc_edge_prob
+
+    return occ_edge_prob
 
 
 def occ_order_pred_to_ori(occ_order, connectivity=4):
@@ -810,26 +883,32 @@ def nms_edge_order_ori(occ_edge, occ_order_pix, occ_ori, occ_thresh):
                                 order_pix_thin[:, :, 8], order_pix_thin[:, :, 3]), axis=2)  # H,W,4
     occ_ori_thin[no_occ] = 127
 
-    return occ_edge_thin * 255, order_pix_thin, order_pair_thin, occ_ori_thin
+    return occ_edge_thin, order_pix_thin, order_pair_thin, occ_ori_thin
 
 
 def nms_occ_order(occ_order_exist_prob, occ_order, occ_thresh):
     """
-    nms edge_prob then mask out non-occlusion region to thin occ order and occ ori
+    nms occ order pred prob to thin occ order and generate occ edge prob
     :param occ_order_exist_prob: numpy, HxWx4, [0~255]
     :param occ_order: numpy, HxWx4, value [0, 1, 2]
     :return: occ_order_thin: numpy, HxWx4, value [0, 1, 2]
     """
     order_prob = occ_order_exist_prob / 255.
-    order_prob_thin = np.zeros(occ_order.shape)
+    order_prob_thin = np.zeros(occ_order.shape)  # H,W,4
     for idx in range(occ_order_exist_prob.shape[2]):
         order_prob_thin[:, :, idx] = edge_nms(order_prob[:, :, idx])
 
     occ_order_thin = occ_order.copy()
     no_occ = (order_prob_thin <= occ_thresh)  # non-occ
     occ_order_thin[no_occ] = 1  # mask out occ order
+    occ_order_thin += -1  # => [-1, 0, 1]
 
-    return occ_order_thin
+    # gen occ edge prob
+    non_occ_probs = 1 - torch.Tensor(order_prob_thin).permute(2, 0, 1).unsqueeze(0)  # N,4,H,W
+    occ_edge_prob = order_prob_to_edge_prob(non_occ_probs)  # N,1,H,W
+    occ_edge_prob = occ_edge_prob.numpy()[0, 0, :, :]
+
+    return occ_order_thin, occ_edge_prob
 
 
 def edge_nms(edge):

@@ -223,15 +223,15 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
         occ_order_NE_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_NE_nms.png'.format(img_name))
 
         # nms occ_edge_prob and thin occ_order
-        edge_nms, order_pix_nms, order_pair_nms, ori_nms = nms_edge_order_ori(occ_edge_prob_pred_viz, occ_order_pred_pix,
-                                                                              occ_ori_pred_viz, occ_thresh=config.TEST.occ_thresh)
+        # edge_nms, order_pix_nms, order_pair_nms, ori_nms = nms_edge_order_ori(occ_edge_prob_pred_viz, occ_order_pred_pix,
+        #                                                                       occ_ori_pred_viz, occ_thresh=config.TEST.occ_thresh)
 
         # nms on occ order prob
-        # occ_order_pred = np.stack((ind_pred_E, ind_pred_S, ind_pred_SE, ind_pred_NE), axis=2)  # H,W,4
-        # order_nms = nms_occ_order(occ_order_exist_prob, occ_order_pred, config.TEST.occ_thresh)
+        occ_order_pred = np.stack((ind_pred_E, ind_pred_S, ind_pred_SE, ind_pred_NE), axis=2)  # H,W,4
+        order_pair_nms, edge_prob_nms = nms_occ_order(occ_order_exist_prob, occ_order_pred, config.TEST.occ_thresh)
 
-        Image.fromarray(edge_nms.astype(np.uint8), mode='L').save(occ_edge_prob_nms_path)
-        Image.fromarray(ori_nms.astype(np.uint8), mode='L').save(occ_ori_nms_path)
+        Image.fromarray((edge_prob_nms * 255).astype(np.uint8), mode='L').save(occ_edge_prob_nms_path)
+        # Image.fromarray(ori_nms.astype(np.uint8), mode='L').save(occ_ori_nms_path)
         Image.fromarray(((order_pair_nms[:, :, 0] + 1) / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_E_path)
         Image.fromarray(((order_pair_nms[:, :, 1] + 1) / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_S_path)
         Image.fromarray(((order_pair_nms[:, :, 2] + 1) / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_SE_path)
