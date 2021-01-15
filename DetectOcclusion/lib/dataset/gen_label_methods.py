@@ -16,6 +16,7 @@ from PIL import Image
 from scipy import pi, ndimage
 sys.path.append('../..')
 from math import atan, tan
+from edge_nms import *
 PI = 3.1416
 
 
@@ -617,55 +618,34 @@ def depth_point2plane(depth, fx, fy):
 
 
 # ================================ functions for label conversion in train/val ======================================= #
-def occ_order_pred_to_edge_prob(occ_order, connectivity=4):
+def occ_order_pred_to_edge_prob(net_out, connectivity=4):
     """
-    edge-wise occ order prediction to pixel-wise occ edge probability
-    :param occ_order: occ order prediction; N,C,H,W ; tensor
+    edge-wise occ order prediction to pixel-wise occ edge probability and pairwise occ order probability (occ exists)
+    :param net_out: net occ order prediction; N,C,H,W ; tensor
     :return: occ_edge_prob, Nx1xHxW, [0~1]; occ_order_exist_prob, Nx2xHxW or Nx4xHxW, [0~1]
     """
     # softmax
-    occ_order_E_prob_edgewise = F.softmax(occ_order[:, 0:3, :, :], dim=1)  # N,1,H,W
-    occ_order_S_prob_edgewise = F.softmax(occ_order[:, 3:6, :, :], dim=1)  # N,1,H,W
-    non_occ_prob_E_edgewise = occ_order_E_prob_edgewise[:, 1, :, :].unsqueeze(1)  # N,1,H,W
-    non_occ_prob_S_edgewise = occ_order_S_prob_edgewise[:, 1, :, :].unsqueeze(1)
+    occ_order_E_prob_pairwise = F.softmax(net_out[:, 0:3, :, :], dim=1)  # N,1,H,W
+    occ_order_S_prob_pairwise = F.softmax(net_out[:, 3:6, :, :], dim=1)  # N,1,H,W
+    non_occ_prob_E_pairwise = occ_order_E_prob_pairwise[:, 1, :, :].unsqueeze(1)  # N,1,H,W
+    non_occ_prob_S_pairwise = occ_order_S_prob_pairwise[:, 1, :, :].unsqueeze(1)
     if connectivity == 8:
-        occ_order_SE_prob_edgewise = F.softmax(occ_order[:, 6:9, :, :], dim=1)  # N,1,H,W
-        occ_order_NE_prob_edgewise = F.softmax(occ_order[:, 9:12, :, :], dim=1)  # N,1,H,W
-        non_occ_prob_SE_edgewise = occ_order_SE_prob_edgewise[:, 1, :, :].unsqueeze(1)  # N,1,H,W
-        non_occ_prob_NE_edgewise = occ_order_NE_prob_edgewise[:, 1, :, :].unsqueeze(1)
+        occ_order_SE_prob_pairwise = F.softmax(net_out[:, 6:9, :, :], dim=1)  # N,1,H,W
+        occ_order_NE_prob_pairwise = F.softmax(net_out[:, 9:12, :, :], dim=1)  # N,1,H,W
+        non_occ_prob_SE_pairwise = occ_order_SE_prob_pairwise[:, 1, :, :].unsqueeze(1)  # N,1,H,W
+        non_occ_prob_NE_pairwise = occ_order_NE_prob_pairwise[:, 1, :, :].unsqueeze(1)
 
     # average to get pixel-wise occ_edge_prob and pairwise occ_order_exist_prob along each inclination
     if connectivity == 4:
-        non_occ_order_probs = torch.cat((non_occ_prob_E_edgewise, non_occ_prob_S_edgewise), 1)  # N,2,H,W
+        non_occ_order_probs = torch.cat((non_occ_prob_E_pairwise, non_occ_prob_S_pairwise), 1)  # N,2,H,W
         occ_edge_prob = order_prob_to_edge_prob(non_occ_order_probs)
-        # non_occ_prob = (non_occ_prob_E_edgewise + non_occ_prob_S_edgewise) / 2
-        # occ_edge_prob = 1. - non_occ_prob
-        occ_order_exist_prob = torch.cat((1 - non_occ_prob_E_edgewise, 1 - non_occ_prob_S_edgewise), 1)  # N,2,H,W
+        occ_order_exist_prob = torch.cat((1 - non_occ_prob_E_pairwise, 1 - non_occ_prob_S_pairwise), 1)  # N,2,H,W
     elif connectivity == 8:
-        non_occ_order_probs = torch.cat((non_occ_prob_E_edgewise, non_occ_prob_S_edgewise,
-                                         non_occ_prob_SE_edgewise, non_occ_prob_NE_edgewise), 1)  # N,4,H,W
+        non_occ_order_probs = torch.cat((non_occ_prob_E_pairwise, non_occ_prob_S_pairwise,
+                                         non_occ_prob_SE_pairwise, non_occ_prob_NE_pairwise), 1)  # N,4,H,W
         occ_edge_prob = order_prob_to_edge_prob(non_occ_order_probs)
-
-        # # padded pred prob
-        # nonocc_pad_E  = nn.ConstantPad2d((1, 0, 0, 0), 1.)  # left, right, up, down ; no occ prob = 1.
-        # nonocc_pad_S  = nn.ConstantPad2d((0, 0, 1, 0), 1.)  # left, right, up, down
-        # nonocc_pad_SE = nn.ConstantPad2d((1, 0, 1, 0), 1.)  # left, right, up, down
-        # nonocc_pad_NE = nn.ConstantPad2d((1, 0, 0, 1), 1.)  # left, right, up, down
-        #
-        # nonocc_pred_E_pad  = nonocc_pad_E(non_occ_prob_E_edgewise)  # N,1,H,W => N,1,H,W+1
-        # nonocc_pred_S_pad  = nonocc_pad_S(non_occ_prob_S_edgewise)  # N,1,H,W => N,1,H+1,W
-        # nonocc_pred_SE_pad = nonocc_pad_SE(non_occ_prob_SE_edgewise)  # N,1,H,W => N,1,H+1,W+1
-        # nonocc_pred_NE_pad = nonocc_pad_NE(non_occ_prob_NE_edgewise)  # N,1,H,W => N,1,H+1,W+1
-        #
-        # # average by 8 in connectivity-8
-        # occ_prob_E  = 1 - (nonocc_pred_E_pad[:, :, :, :-1] + nonocc_pred_E_pad[:, :, :, 1:]) / 2  # N,1,H,W
-        # occ_prob_S  = 1 - (nonocc_pred_S_pad[:, :, :-1, :] + nonocc_pred_S_pad[:, :, 1:, :]) / 2  # N,1,H,W
-        # occ_prob_SE = 1 - (nonocc_pred_SE_pad[:, :, :-1, :-1] + nonocc_pred_SE_pad[:, :, 1:, 1:]) / 2  # N,1,H,W
-        # occ_prob_NE = 1 - (nonocc_pred_NE_pad[:, :, 1:, :-1] + nonocc_pred_NE_pad[:, :, :-1, 1:]) / 2  # N,1,H,W
-        #
-        # occ_edge_prob = (occ_prob_E + occ_prob_S + occ_prob_SE + occ_prob_NE) / 4  # N,1,H,W
-        occ_order_exist_prob = torch.cat((1 - non_occ_prob_E_edgewise, 1 - non_occ_prob_S_edgewise,
-                                          1 - non_occ_prob_SE_edgewise, 1 - non_occ_prob_NE_edgewise), 1)  # N,4,H,W
+        occ_order_exist_prob = torch.cat((1 - non_occ_prob_E_pairwise, 1 - non_occ_prob_S_pairwise,
+                                          1 - non_occ_prob_SE_pairwise, 1 - non_occ_prob_NE_pairwise), 1)  # N,4,H,W
 
     return occ_edge_prob, occ_order_exist_prob
 
@@ -786,7 +766,7 @@ def order4_to_order_pixwise(occ_edge_prob, occ_order_E, occ_order_S):
     :param occ_edge_prob: H,W ; [0~1] ; tensor
     :param occ_order_E: 1,H,W ; [0,1,2]
     :param occ_order_S: 1,H,W ; [0,1,2]
-    :return: occ_order_pix; H,W,9 ; occ_edge_prob ([-127~127]) + occ_order along 8 neighbor directions ('occlude':1,'occluded':-1,'no occ':0)
+    :return: occ_order_pix; H,W,9 ; occ_edge_prob ([0~127]) + occ_order along 8 neighbor directions ('occlude':1,'occluded':-1,'no occ':0)
     """
     occ_edge_prob = occ_edge_prob.squeeze()
     H, W = occ_edge_prob.shape
@@ -862,6 +842,36 @@ def order8_to_order_pixwise(occ_edge_prob, occ_order_E, occ_order_S, occ_order_S
     return occ_order_pix
 
 
+def order8_to_order_pixwise_np(occ_edge_prob, occ_order):
+    """
+    convert connectivity-8 pairwise occ order prediction to pixel-wise occ order label H,W,9 for downstream tasks
+    :param occ_edge_prob: H,W ; [0~1] ; numpy
+    :param occ_order: H,W,4; [-1,0,1]; numpy
+    :return: occ_order_pix; H,W,9 ; occ_edge_prob ([0~127]) + occ_order along 8 neighbor directions ('occlude':1,'occluded':-1,'no occ':0)
+    """
+    H, W = occ_edge_prob.shape
+    occ_order_pix = np.zeros((H, W, 9))
+    occ_order_pix[:, :, 0] = occ_edge_prob * 127
+
+    # W,E direction
+    occ_order_pix[:, 1:, 4] = -occ_order[:, :-1, 0]
+    occ_order_pix[:, :, 5] = occ_order[:, :, 0]
+
+    # N,S direction
+    occ_order_pix[1:, :, 2] = -occ_order[:-1, :, 1]
+    occ_order_pix[:, :, 7] = occ_order[:, :, 1]
+
+    # NW,SE direction
+    occ_order_pix[1:, 1:, 1] = -occ_order[:-1, :-1, 2]
+    occ_order_pix[:, :, 8] = occ_order[:, :, 2]
+
+    # SW,NE direction
+    occ_order_pix[:-1, 1:, 6] = -occ_order[1:, :-1, 3]
+    occ_order_pix[:, :, 3] = occ_order[:, :, 3]
+
+    return occ_order_pix.astype(np.int8)
+
+
 def nms_edge_order_ori(occ_edge, occ_order_pix, occ_ori, occ_thresh):
     """
     nms pixel-wise edge_prob then mask out non-occlusion region to thin occ order and occ ori
@@ -891,7 +901,7 @@ def nms_occ_order(occ_order_exist_prob, occ_order, occ_thresh):
     nms occ order pred prob to thin occ order and generate occ edge prob
     :param occ_order_exist_prob: numpy, HxWx4, [0~255]
     :param occ_order: numpy, HxWx4, value [0, 1, 2]
-    :return: occ_order_thin: numpy, HxWx4, value [0, 1, 2]
+    :return: occ_order_thin: numpy, HxWx4, value [-1, 0, 1]
     """
     order_prob = occ_order_exist_prob / 255.
     order_prob_thin = np.zeros(occ_order.shape)  # H,W,4
@@ -927,57 +937,85 @@ def edge_nms(edge):
     return edge_thin
 
 
-def non_maximum_supr(edge, ori, r, s, m):
-    """
-    Non-Maximum Suppression (from https://github.com/ArtanisCV/StructuredForests/ cython version)
-    :param edge: original edge map HxW
-    :param ori: orientation map HxW
-    :param r: radius for nms suppression
-    :param s: radius for suppress boundaries
-    :param m: multiplier for conservative suppression
-    :return: suppressed edge map
-    """
-
-    h = edge.shape[0]
-    w = edge.shape[1]
-    E_arr = np.zeros((h, w), dtype=np.float64)
-    E = E_arr
-    C = np.cos(ori)
-    S = np.sin(ori)
-
-    # suppress edges where edge is stronger in orthogonal direction
-    for y in range(0, h):
-        for x in range(0, w):
-            e = E[y, x] = edge[y, x]
-            if e == 0:
-                continue
-
-            e *= m
-            co = C[y, x]
-            si = S[y, x]
-
-            for d in range(-r, r + 1):
-                if d != 0:
-                    e0 = bilinear_interp(edge, x + d * co, y + d * si)
-                    if e < e0:
-                        E[y, x] = 0
-                        break
-
-    # suppress noisy edge estimates near boundaries
-    s = w / 2 if s > w / 2 else s
-    s = h / 2 if s > h / 2 else s
-
-    for x in range(0, s):
-        for y in range(0, h):
-            E[y, x] *= x / s
-            E[y, w - 1 - x] *= x / s
-
-    for x in range(0, w):
-        for y in range(0, s):
-            E[y, x] *= y / s
-            E[h - 1 - y, x] *= y / s
-
-    return E_arr
+# def non_maximum_supr(edge, ori, r, s, m):
+#     """
+#     Non-Maximum Suppression (from https://github.com/ArtanisCV/StructuredForests/ cython version)
+#     :param edge: original edge map HxW
+#     :param ori: orientation map HxW
+#     :param r: radius for nms suppression
+#     :param s: radius for suppress boundaries
+#     :param m: multiplier for conservative suppression
+#     :return: suppressed edge map
+#     """
+#
+#     h = edge.shape[0]
+#     w = edge.shape[1]
+#     E_arr = np.zeros((h, w), dtype=np.float64)
+#     E = E_arr
+#     C = np.cos(ori)
+#     S = np.sin(ori)
+#
+#     # suppress edges where edge is stronger in orthogonal direction
+#     for y in range(0, h):
+#         for x in range(0, w):
+#             e = E[y, x] = edge[y, x]
+#             if e == 0:
+#                 continue
+#
+#             e *= m
+#             co = C[y, x]
+#             si = S[y, x]
+#
+#             for d in range(-r, r + 1):
+#                 if d != 0:
+#                     e0 = bilinear_interp(edge, x + d * co, y + d * si)
+#                     if e < e0:
+#                         E[y, x] = 0
+#                         break
+#
+#     # suppress noisy edge estimates near boundaries
+#     s = w / 2 if s > w / 2 else s
+#     s = h / 2 if s > h / 2 else s
+#
+#     for x in range(0, s):
+#         for y in range(0, h):
+#             E[y, x] *= x / s
+#             E[y, w - 1 - x] *= x / s
+#
+#     for x in range(0, w):
+#         for y in range(0, s):
+#             E[y, x] *= y / s
+#             E[h - 1 - y, x] *= y / s
+#
+#     return E_arr
+#
+#
+# def bilinear_interp(img, x, y):
+#     """
+#     Return img[y, x] via bilinear interpolation
+#     """
+#     h, w = img.shape[0:2]
+#
+#     if x < 0:
+#         x = 0
+#     elif x > w - 1.001:
+#         x = w - 1.001
+#
+#     if y < 0:
+#         y = 0
+#     elif y > h - 1.001:
+#         y = h - 1.001
+#
+#     x0 = int(x)
+#     y0 = int(y)
+#     x1 = x0 + 1
+#     y1 = y0 + 1
+#     dx0 = x - x0
+#     dy0 = y - y0
+#     dx1 = 1 - dx0
+#     dy1 = 1 - dy0
+#
+#     return img[y0, x0]*dx1*dy1 + img[y0, x1]*dx0*dy1 + img[y1, x0]*dx1*dy0 + img[y1, x1]*dx0*dy0
 
 
 def conv_tri(src, radius):
@@ -999,34 +1037,6 @@ def conv_tri(src, radius):
         kernel = list(range(1, radius + 1)) + [radius + 1] + list(range(radius, 0, -1))  # [1,...,r+1,...,1]
         kernel = np.asarray(kernel, dtype=np.float64) / (radius + 1)**2
         return cv2.sepFilter2D(src, ddepth=-1, kernelX=kernel, kernelY=kernel, borderType=cv2.BORDER_REFLECT)
-
-
-def bilinear_interp(img, x, y):
-    """
-    Return img[y, x] via bilinear interpolation
-    """
-    h, w = img.shape[0:2]
-
-    if x < 0:
-        x = 0
-    elif x > w - 1.001:
-        x = w - 1.001
-
-    if y < 0:
-        y = 0
-    elif y > h - 1.001:
-        y = h - 1.001
-
-    x0 = int(x)
-    y0 = int(y)
-    x1 = x0 + 1
-    y1 = y0 + 1
-    dx0 = x - x0
-    dy0 = y - y0
-    dx1 = 1 - dx0
-    dy1 = 1 - dy0
-
-    return img[y0, x0]*dx1*dy1 + img[y0, x1]*dx0*dy1 + img[y1, x0]*dx1*dy0 + img[y1, x1]*dx0*dy0
 # ==================================================================================================================== #
 
 

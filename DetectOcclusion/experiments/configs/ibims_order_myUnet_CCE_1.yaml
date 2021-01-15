@@ -75,3 +75,4 @@ TEST:
     - 0
     - 2
   out_nms_res: True
+  nms_method: 'pixel-wise'

@@ -126,6 +126,7 @@ config.TEST.img_padding = False  # only reflective padding to make img suitable 
 config.TEST.class_sel_ind = []  # selected class indices for occlusion evaluation
 config.TEST.vis_type = ''
 config.TEST.out_nms_res = False  # directly output res after nms, which is not for evaluation
+config.TEST.nms_method = 'pixel-wise'  # ['pixel-wise'|'pairwise']  # nms on occ_edge_prob or occ_order_prob
 config.TEST.occ_thresh = 0.5  # binary occlusion edge threshold on edge probability
 # ==================================================================================================================== #
 

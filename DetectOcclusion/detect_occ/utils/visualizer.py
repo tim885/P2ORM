@@ -15,7 +15,8 @@ import cv2
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')  # use matplotlib without gui support
 sys.path.append('../..')
-from lib.dataset.gen_label_methods import order4_to_order_pixwise, order8_to_order_pixwise, occ_order_pred_to_edge_prob, occ_order_pred_to_ori, nms_edge_order_ori, nms_occ_order
+from lib.dataset.gen_label_methods import order4_to_order_pixwise, order8_to_order_pixwise, \
+    occ_order_pred_to_edge_prob, occ_order_pred_to_ori, nms_edge_order_ori, nms_occ_order, order8_to_order_pixwise_np
 
 PI = 3.1416
 curr_path = os.path.abspath(os.path.dirname(__file__))
@@ -136,7 +137,7 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
     img_suffix = '.{}'.format(file_name.split('.')[-1])
     img_name = file_name.replace(img_suffix, '')
 
-    # set res dirs
+    # set res dirs and paths
     valset_name = config.dataset.test_dataset
     root_eval_dir = os.path.join(out_dir, 'test_{}_{}'.format(epoch, valset_name))
     lbl_eval_dir = os.path.join(root_eval_dir, 'res_mat')
@@ -144,98 +145,108 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
     if not os.path.exists(root_eval_dir): os.makedirs(root_eval_dir)
     if not os.path.exists(lbl_eval_dir): os.makedirs(lbl_eval_dir)
     if not os.path.exists(img_eval_dir): os.makedirs(img_eval_dir)
+    rgb_path = os.path.join(img_eval_dir, '{}_img_v.png'.format(img_name))
+    occ_edge_prob_path = os.path.join(img_eval_dir, '{}_lab_v_g.png'.format(img_name))
+    occ_ori_path = os.path.join(img_eval_dir, '{}_lab_v_g_ori.png'.format(img_name))
 
     # get original img
     mean_values = torch.tensor(config.dataset.pixel_means, dtype=net_in.dtype).view(3, 1, 1)
     std_values  = torch.tensor(config.dataset.pixel_stds, dtype=net_in.dtype).view(3, 1, 1)
-    img_in_viz = net_in[0, :3, :, :].cpu() * std_values + mean_values
-    img_in_viz = np.transpose(img_in_viz.numpy(), (1, 2, 0)).astype(np.float32)  # 3,H,W => H,W,3
-    H, W = img_in_viz.shape[:2]
+    img_in_vis = net_in[0, :3, :, :].cpu() * std_values + mean_values
+    img_in_vis = np.transpose(img_in_vis.numpy(), (1, 2, 0)).astype(np.float32)  # 3,H,W => H,W,3
+    H, W = img_in_vis.shape[:2]
 
     if config.network.task_type == 'occ_order':
         # gen occ edge/ori/order pred
-        occ_edge_prob_pred, occ_order_exist_prob = occ_order_pred_to_edge_prob(net_out, config.dataset.connectivity)  # N,1,H,W
-        occ_ori_pred       = occ_order_pred_to_ori(net_out, config.dataset.connectivity)  # N,1,H,W
-        _, ind_pred_E = net_out[0, :3, :, :].topk(1, dim=0, largest=True, sorted=True)  # 1,H,W; [0,1,2]
-        _, ind_pred_S = net_out[0, 3:6, :, :].topk(1, dim=0, largest=True, sorted=True)
+        occ_edge_prob, occ_order_exist_prob = occ_order_pred_to_edge_prob(net_out, config.dataset.connectivity)  # N,1,H,W
+        occ_ori = occ_order_pred_to_ori(net_out, config.dataset.connectivity)  # N,1,H,W
+        _, occ_order_pair_E = net_out[0, :3, :, :].topk(1, dim=0, largest=True, sorted=True)  # 1,H,W; [0,1,2]
+        _, occ_order_pair_S = net_out[0, 3:6, :, :].topk(1, dim=0, largest=True, sorted=True)
         if config.dataset.connectivity == 8:
-            _, ind_pred_SE = net_out[0, 6:9, :, :].topk(1, dim=0, largest=True, sorted=True)  # 1,H,W; [0,1,2]
-            _, ind_pred_NE = net_out[0, 9:12, :, :].topk(1, dim=0, largest=True, sorted=True)
+            _, occ_order_pair_SE = net_out[0, 6:9, :, :].topk(1, dim=0, largest=True, sorted=True)  # 1,H,W; [0,1,2]
+            _, occ_order_pair_NE = net_out[0, 9:12, :, :].topk(1, dim=0, largest=True, sorted=True)
 
+        # get pixel-wise occlusion order maps (occ_edge + occ_order along directions)
         if config.dataset.connectivity == 4:
-            occ_order_pred_pix = order4_to_order_pixwise(occ_edge_prob_pred, ind_pred_E, ind_pred_S)  # H,W,9
+            occ_order_pix = order4_to_order_pixwise(occ_edge_prob, occ_order_pair_E, occ_order_pair_S)  # H,W,9
         elif config.dataset.connectivity == 8:
-            occ_order_pred_pix = order8_to_order_pixwise(occ_edge_prob_pred, ind_pred_E, ind_pred_S, ind_pred_SE, ind_pred_NE)  # H,W,9
+            occ_order_pix = order8_to_order_pixwise(occ_edge_prob, occ_order_pair_E, occ_order_pair_S,
+                                                    occ_order_pair_SE, occ_order_pair_NE)  # H,W,9
 
-        # viz occ edge/ori/order
-        occ_edge_prob_pred_viz = np.array(occ_edge_prob_pred.cpu()[0, 0, :, :] * 255, dtype=np.uint8)  # [0,1] => [0,255]
-        occ_order_exist_prob = np.array(occ_order_exist_prob.cpu()[0, :, :, :] * 255, dtype=np.uint8).transpose((1, 2, 0))  # [0,1] => [0,255], HxWxC
-        occ_ori_pred_viz       = (np.array(occ_ori_pred.cpu())[0, 0, :, :] / PI + 1) / 2. * 255.  # [-PI,PI] => [0,255]
-        ind_pred_E = np.array(ind_pred_E.cpu()).reshape(H, W).astype(np.float32)  # 1,H,W => H,W,1
-        ind_pred_S = np.array(ind_pred_S.cpu()).reshape(H, W).astype(np.float32)  # 1,H,W => H,W,1
-        if config.dataset.connectivity == 8:
-            ind_pred_SE = np.array(ind_pred_SE.cpu()).reshape(H, W).astype(np.float32)  # 1,H,W => H,W,1
-            ind_pred_NE = np.array(ind_pred_NE.cpu()).reshape(H, W).astype(np.float32)  # 1,H,W => H,W,1
+        occ_edge_prob_vis = np.array(occ_edge_prob.cpu()[0, 0, :, :] * 255, dtype=np.uint8)  # [0,1] => [0,255]
+        occ_order_exist_prob_vis = np.array(occ_order_exist_prob.cpu()[0, :, :, :] * 255, dtype=np.uint8).transpose((1, 2, 0))  # [0,1] => [0,255], HxWxC
+        occ_ori_vis = (np.array(occ_ori.cpu())[0, 0, :, :] / PI + 1) / 2. * 255.  # [-PI,PI] => [0,255]
 
         # save pred occ order imgs
-        occ_order_E4eval_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_E.png'.format(img_name))
-        occ_order_S4eval_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_S.png'.format(img_name))
-        Image.fromarray((ind_pred_E / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_E4eval_path)
-        Image.fromarray((ind_pred_S / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_S4eval_path)
+        occ_order_E_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_E.png'.format(img_name))
+        occ_order_S_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_S.png'.format(img_name))
+        occ_order_pair_E = np.array(occ_order_pair_E.cpu()).reshape(H, W).astype(np.float32)  # 1,H,W => H,W,1
+        occ_order_pair_S = np.array(occ_order_pair_S.cpu()).reshape(H, W).astype(np.float32)  # 1,H,W => H,W,1
+        Image.fromarray((occ_order_pair_E / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_E_path)
+        Image.fromarray((occ_order_pair_S / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_S_path)
         if config.dataset.connectivity == 8:
-            occ_order_SE4eval_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_SE.png'.format(img_name))
-            occ_order_NE4eval_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_NE.png'.format(img_name))
-            Image.fromarray((ind_pred_SE / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_SE4eval_path)
-            Image.fromarray((ind_pred_NE / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_NE4eval_path)
+            occ_order_SE_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_SE.png'.format(img_name))
+            occ_order_NE_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_NE.png'.format(img_name))
+            occ_order_pair_SE = np.array(occ_order_pair_SE.cpu()).reshape(H, W).astype(np.float32)  # 1,H,W => H,W,1
+            occ_order_pair_NE = np.array(occ_order_pair_NE.cpu()).reshape(H, W).astype(np.float32)  # 1,H,W => H,W,1
+            Image.fromarray((occ_order_pair_SE / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_SE_path)
+            Image.fromarray((occ_order_pair_NE / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_NE_path)
 
-        # save pred occ order npy before NMS
-        occ_order_eval_dir = os.path.join(lbl_eval_dir, 'test_order_pred')
-        if not os.path.exists(occ_order_eval_dir): os.makedirs(occ_order_eval_dir)
-        occ_order_pred_path = os.path.join(occ_order_eval_dir, '{}-order-pix.npy'.format(img_name))
-        np.save(occ_order_pred_path, occ_order_pred_pix)
+        # save pixel-wise occ order npy before NMS
+        occ_order_pix_dir = os.path.join(lbl_eval_dir, 'test_order_pred')
+        if not os.path.exists(occ_order_pix_dir):
+            os.makedirs(occ_order_pix_dir)
+        occ_order_pix_path = os.path.join(occ_order_pix_dir, '{}-order-pix.npz'.format(img_name))
+        # np.save(occ_order_pix_path, occ_order_pix.astype(np.int8))
+        np.savez_compressed(occ_order_pix_path, order=occ_order_pix.astype(np.int8))
+
+        # save res after nms,  which is not used for evaluation in matlab
+        if config.TEST.out_nms_res:
+            occ_edge_prob_nms_path = os.path.join(img_eval_dir, '{}_lab_v_g_nms.png'.format(img_name))
+            occ_order_E_nms_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_E_nms.png'.format(img_name))
+            occ_order_S_nms_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_S_nms.png'.format(img_name))
+            occ_order_SE_nms_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_SE_nms.png'.format(img_name))
+            occ_order_NE_nms_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_NE_nms.png'.format(img_name))
+
+            if config.TEST.nms_method == 'pixel-wise':  # nms on occ_edge_prob and out occ_edge, occ_order, occ_ori
+                occ_edge_prob_nms, occ_order_pix_nms, occ_order_pair_nms, occ_ori_nms = \
+                               nms_edge_order_ori(occ_edge_prob_vis, occ_order_pix, occ_ori_vis, config.TEST.occ_thresh)
+                occ_ori_nms_path = os.path.join(img_eval_dir, '{}_lab_v_g_ori_nms.png'.format(img_name))
+                Image.fromarray(occ_ori_nms.astype(np.uint8), mode='L').save(occ_ori_nms_path)
+            elif config.TEST.nms_method == 'pairwise':  # nms occ_order_prob and out occ_edge, occ_order (not for eval)
+                occ_order_pair = np.stack((occ_order_pair_E, occ_order_pair_S, occ_order_pair_SE, occ_order_pair_NE), axis=2)  # H,W,4
+                occ_order_pair_nms, occ_edge_prob_nms = nms_occ_order(occ_order_exist_prob_vis, occ_order_pair, config.TEST.occ_thresh)
+                occ_order_pix_nms = order8_to_order_pixwise_np(occ_edge_prob_nms, occ_order_pair_nms)
+
+            # save imgs of occ_edge and occ_order
+            Image.fromarray((occ_edge_prob_nms * 255).astype(np.uint8), mode='L').save(occ_edge_prob_nms_path)
+            Image.fromarray(((occ_order_pair_nms[:, :, 0]+1)/2.*255.).astype(np.uint8), mode='L').save(occ_order_E_nms_path)
+            Image.fromarray(((occ_order_pair_nms[:, :, 1]+1)/2.*255.).astype(np.uint8), mode='L').save(occ_order_S_nms_path)
+            Image.fromarray(((occ_order_pair_nms[:, :, 2]+1)/2.*255.).astype(np.uint8), mode='L').save(occ_order_SE_nms_path)
+            Image.fromarray(((occ_order_pair_nms[:, :, 3]+1)/2.*255.).astype(np.uint8), mode='L').save(occ_order_NE_nms_path)
+
+            # save pixel-wise occ_order after nms
+            occ_order_nms_dir = os.path.join(lbl_eval_dir, 'test_order_nms_pred')
+            if not os.path.exists(occ_order_nms_dir):
+                os.makedirs(occ_order_nms_dir)
+            occ_order_pix_nms_path = os.path.join(occ_order_nms_dir, '{}-order-pix.npz'.format(img_name))
+            np.savez_compressed(occ_order_pix_nms_path, order=occ_order_pix_nms.astype(np.int8))
 
     elif config.network.task_type == 'occ_ori':
-        occ_edge_prob_pred_viz = np.array(net_out.cpu()[0, 0, :, :] * 255., dtype=np.uint8)  # [0, 1] => [0, 255]
-        occ_ori_pred           = torch.clamp(net_out[0, 1, :, :], -PI, PI)
-        occ_ori_pred_viz       = (np.array(occ_ori_pred.cpu()) / PI + 1) / 2. * 255.  # [-PI, PI] => [0, 255]
+        occ_edge_prob_vis = np.array(net_out.cpu()[0, 0, :, :] * 255., dtype=np.uint8)  # [0, 1] => [0, 255]
+        occ_ori           = torch.clamp(net_out[0, 1, :, :], -PI, PI)
+        occ_ori_vis       = (np.array(occ_ori.cpu()) / PI + 1) / 2. * 255.  # [-PI, PI] => [0, 255]
 
     # save img, pred occ edge/ori
-    rgb_path           = os.path.join(img_eval_dir, '{}_img_v.png'.format(img_name))
-    occ_edge_prob_path = os.path.join(img_eval_dir, '{}_lab_v_g.png'.format(img_name))
-    occ_ori_path       = os.path.join(img_eval_dir, '{}_lab_v_g_ori.png'.format(img_name))
-    Image.fromarray((img_in_viz * 255.).astype(np.uint8)).save(rgb_path)
-    Image.fromarray(occ_edge_prob_pred_viz, mode='L').save(occ_edge_prob_path)
-    Image.fromarray(occ_ori_pred_viz.astype(np.uint8), mode='L').save(occ_ori_path)
+    Image.fromarray((img_in_vis * 255.).astype(np.uint8)).save(rgb_path)
+    Image.fromarray(occ_edge_prob_vis, mode='L').save(occ_edge_prob_path)
+    Image.fromarray(occ_ori_vis.astype(np.uint8), mode='L').save(occ_ori_path)
 
     # save .mat res for edge/ori eval if matlab GT exists
     if config.dataset.val_w_mat_gt:
         matlab_tool = MATLAB(root_eval_dir, 'Experiment = %s, Phase = %s, Epoch = %s' % (valset_name, 'test', epoch))
-        preds_list  = [occ_edge_prob_pred_viz, occ_ori_pred_viz]
+        preds_list  = [occ_edge_prob_vis, occ_ori_vis]
         save_res_matlab(matlab_tool, {'lab_v_g': preds_list}, img_name)
-
-    # save res after nms directly (for predicting p2orm case), which is not for evaluation in matlab
-    if config.network.task_type == 'occ_order' and config.TEST.out_nms_res:
-        occ_edge_prob_nms_path = os.path.join(img_eval_dir, '{}_lab_v_g_nms.png'.format(img_name))
-        occ_ori_nms_path = os.path.join(img_eval_dir, '{}_lab_v_g_ori_nms.png'.format(img_name))
-        occ_order_E_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_E_nms.png'.format(img_name))
-        occ_order_S_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_S_nms.png'.format(img_name))
-        occ_order_SE_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_SE_nms.png'.format(img_name))
-        occ_order_NE_path = os.path.join(img_eval_dir, '{}_lab_v_g_order_NE_nms.png'.format(img_name))
-
-        # nms occ_edge_prob and thin occ_order
-        # edge_nms, order_pix_nms, order_pair_nms, ori_nms = nms_edge_order_ori(occ_edge_prob_pred_viz, occ_order_pred_pix,
-        #                                                                       occ_ori_pred_viz, occ_thresh=config.TEST.occ_thresh)
-
-        # nms on occ order prob
-        occ_order_pred = np.stack((ind_pred_E, ind_pred_S, ind_pred_SE, ind_pred_NE), axis=2)  # H,W,4
-        order_pair_nms, edge_prob_nms = nms_occ_order(occ_order_exist_prob, occ_order_pred, config.TEST.occ_thresh)
-
-        Image.fromarray((edge_prob_nms * 255).astype(np.uint8), mode='L').save(occ_edge_prob_nms_path)
-        # Image.fromarray(ori_nms.astype(np.uint8), mode='L').save(occ_ori_nms_path)
-        Image.fromarray(((order_pair_nms[:, :, 0] + 1) / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_E_path)
-        Image.fromarray(((order_pair_nms[:, :, 1] + 1) / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_S_path)
-        Image.fromarray(((order_pair_nms[:, :, 2] + 1) / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_SE_path)
-        Image.fromarray(((order_pair_nms[:, :, 3] + 1) / 2. * 255.).astype(np.uint8), mode='L').save(occ_order_NE_path)
 
 
 def plot_conf_mat(confusion_mat, out_path, epoch, title=''):
