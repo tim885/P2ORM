@@ -417,7 +417,7 @@ def occ_order_connect4_to_occ_ori(occ_order):
 
 def occ_order_to_edge(occ_order, connectivity=4):
     """
-    convert pairwise occ order to Figure/Ground notion and occ edge
+    convert occ order to occ edge foreground/background and occ edge
     :param occ_order: pix occ order with its neighbor pixs: H,W,9
     :param connectivity: 4 or 8, neighborhood type
     """

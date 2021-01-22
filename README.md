@@ -53,8 +53,9 @@ conda activate P2ORM
 ```
 
 ### 2.2 Data preparation
-Download relevant dataset and unzip it in folder data/.  
+Download the relevant dataset and unzip it in folder data/.
 
+#### 2.2.1 Download datasets with occlusion labels for train/test.
 Download BSDS300.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdv3gqnp2iElQ_9iw?e=Ni7Idb).
 
 Download InteriorNet_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYd1UPeUgMxXbi766Q?e=tK0fbD).
@@ -62,6 +63,13 @@ Download InteriorNet_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYd1UPeUgMxXb
 Download iBims1_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdzBIOqzgHsVvP8VQ?e=gUMk53).
 
 Download NYUv2_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYd0JZ-NwwPjuhbmZA?e=mnCPog).
+
+#### 2.2.2 Generate occlusion labels on a dataset (e.g., InteriorNet).
+Download InteriorNet.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jaNF_Sot5YV39ja9oA?e=Nb1TSs)
+
+N.B. The file is used only for a demonstration, please refer to [here](https://interiornet.org/) for the whole dataset.
+
+####
 
 ## 3. Evaluation
 ### 3.1 Pixel-Pair Occlusion Detection
@@ -178,6 +186,15 @@ python train_val.py --config ../experiments/configs/nyuv2_order_myUnet_CCE_1.yam
 Our model is trained on 10,160 images of InteriorNet_OR for 30 epochs:
 ```
 cd ./DepthRefine/
-python train.py --save_dir #save_model_path
+python train.py --save_dir # save_model_path
 ```
 The whole training procedure can be finished in ~10 hours with a single TitanX GPU.
+
+### 5. Generate occlusion labels
+```shell script
+# create data dir symbole link  
+cd DetectOcclusion/ && ln -s ../data/ data/ && cd utils
+
+# generate occlusion labels on InteriorNet (please refer to the script for more details)
+python gen_InteriornetOR_label.py
+```
