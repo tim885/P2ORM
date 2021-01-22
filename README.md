@@ -49,7 +49,7 @@ cd P2ORM
 # Create python env with relevant dependencies
 conda create --name P2ORM --file spec-file.txt
 conda activate P2ORM
-/your_conda_root/envs/P2ORM/bin/pip install tensorboardX
+/your_conda_root/envs/P2ORM/bin/pip install tensorboardX Cython
 ```
 
 ### 2.2 Data preparation
