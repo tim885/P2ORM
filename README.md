@@ -1,7 +1,12 @@
 # P2ORM: Formulation, Inference & Application 
-This repository contains the official Pytorch implementation of our paper: "Pixel-Pair Occlusion Relationship Map (P2ORM): Formulation, Inference & Application" (ECCV 2020 Spotlight). For more details such as videos and introduction slides, please refer to our project webpage.    
+This repository contains the official PyTorch implementation of our paper: "Pixel-Pair Occlusion  Relationship Map (P2ORM): Formulation, Inference & Application" (ECCV 2020 Spotlight).  
+It contains two parts: the estimation of occlusion boundaries with directions and the refinement on depth maps using the estimated occlusions. By using this repository, you can evaluate the pretrained models, train your own models and generate new occlusion annotations with the proposed method. For more details such as videos and introduction slides, please refer to our project webpage.
 
 [[Project webpage]](http://imagine.enpc.fr/~qiux/P2ORM/) [[Paper]](https://arxiv.org/pdf/2007.12088.pdf) [[Supp.]](http://imagine.enpc.fr/~qiux/P2ORM/supp.pdf)
+
+News (2021-01-28): The code for occlusion label generation is released!
+
+News (2020-08-28): The code for training and test is released!
 
 <p align="center">
 <img src="https://github.com/tim885/P2ORM/blob/master/img/overview.PNG" width="800px" alt="teaser">
@@ -17,19 +22,22 @@ If our project is helpful for your research, please consider citing :
 }
 ```
 
-## Table of content
+## Table of contents
 * [1. Visual Results](#1-visual-results)
 * [2. Installation](#2-installation)
 * [3. Evaluation](#3-evaluation)
 * [4. Train](#4-train)
+* [5. Generate Occlusion Labels](#5-generate-occlusion-labels)
 
 ## 1. Visual Results
 ### 1.1 Occlusion boundary and orientation estimation
+Given an image as input, the model predicts occlusion status between neighbor pixels which can be converted to occlusion boundaries with orientations (the left-side of a green arrow is the occlusion foreground). In the predictions, green color indicates the correctly estimated boundaries.
 <p align="center">
 <img src="https://github.com/tim885/P2ORM/blob/master/img/occ_vis_bsds.png" width="800px" alt="occ_vis">
 </p>
 
 ### 1.2 Depth map refinement
+Given an initial depth prediction and the estimated occlusions as input, the model predicts a refined depth map.
 <p align="center">
 <img src="https://github.com/tim885/P2ORM/blob/master/img/depth_vis_nyudv2.png" width="800px" alt="depth_vis">
 </p>
@@ -37,7 +45,7 @@ If our project is helpful for your research, please consider citing :
 ## 2. Installation
 ### 2.1 Dependencies
 The code has been tested on ubuntu 16.04 with a single GeForce GTX TITAN X (12GB). The main dependencies are: Python=3.6, 
-Pytorch>=1.1.0 and Torchvision>=0.3.0. Please install Pytorch version based on your CUDA version.
+Pytorch>=1.1.0 and Torchvision>=0.3.0. Please install the PyTorch version based on your CUDA version.
 
 We recommend to utilize conda environment to install all dependencies and test the code.
 
@@ -49,11 +57,11 @@ cd P2ORM
 # Create python env with relevant dependencies
 conda create --name P2ORM --file spec-file.txt
 conda activate P2ORM
-/your_conda_root/envs/P2ORM/bin/pip install tensorboardX Cython
+/your_conda_root/envs/P2ORM/bin/pip install tensorboardX Cython 
 ```
 
 ### 2.2 Data preparation
-Download the relevant dataset and unzip it in folder data/.
+Download the relevant dataset and unzip it in folder ./data/.
 
 #### 2.2.1 Download datasets with occlusion labels for train/test.
 Download BSDS300.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdv3gqnp2iElQ_9iw?e=Ni7Idb).
@@ -64,7 +72,7 @@ Download iBims1_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdzBIOqzgHsVvP8VQ
 
 Download NYUv2_OR.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jYd0JZ-NwwPjuhbmZA?e=mnCPog).
 
-#### 2.2.2 Generate occlusion labels on a dataset (e.g., InteriorNet).
+#### 2.2.2 Generate new occlusion labels on a dataset (e.g., InteriorNet).
 Download InteriorNet.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jaNF_Sot5YV39ja9oA?e=Nb1TSs)
 
 N.B. The file is used only for a demonstration, please refer to [here](https://interiornet.org/) for the whole dataset.
@@ -81,6 +89,7 @@ Download pretrained model for iBims1_OR [here](https://1drv.ms/u/s!AhUxUphMG7I4j
 Download pretrained model for NYUv2_OR [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdwlHOPtVS_CgwXdg?e=vOlT3V). 
 
 #### 3.1.2 Test and evaluation
+Use the pretrained models and test them on three datasets. The models predict occlusion status between neighbor pixels for each image and save them in the corresponding files.
 ```shell
 # create data dir symbole link for occlusion detection and exp dir 
 cd DetectOcclusion/ && ln -s ../data/ data/
@@ -98,31 +107,35 @@ python train_val.py --config ../experiments/configs/ibims_order_myUnet_CCE_1.yam
 mkdir DetectOcclusion/output/NYUv2OR_pretrained/  # and put pretrained model here
 python train_val.py --config ../experiments/configs/nyuv2_order_myUnet_CCE_1.yaml --evaluate --resume NYUv2OR_pretrained/NYUv2OR_epoch74.pth.tar --gpus 0
 
-# do non-maximum suppression on predictions and evaluate (default: BSDSownership)
+# (Optional) we use cython to boost the speed of NMS. Run this if you can't run the test code. 
+cd DetectOcclusion/lib/dataset
+python setup_cython.py build_ext --inplace
+
+# evaluate the predictions with matlab (default: BSDSownership)
 # please refer to evaluation_matlab/README.md for more details
 cd ../evaluation_matlab/evaluation/
 matlab -nodisplay
 run EvaluateOcc.m
-
-# gen pairwise occlusion after NMS in exp_dir for downstream task (default: BSDSownership)
-cd ../../utils/ && python gen_nms_occ_order.py
 ```
-
-We also offer pairwise occlusion predictions for downstream task directly:
-
-Download pairwise occlusion prediction for iBims-1 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdxC6qiKGoHKXB0Lg?e=eUPsYS).
-
-Download pairwise occlusion prediction for NYUv2 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdyMeuvdCZyKE5OWw?e=Gann3f).
-
+The pairwise occlusion predictions (.npz files) for a dataset (e.g., iBims1OR) are stored in the following directory:
+```
+./DetectOcclusion/experiments/output/iBims1OR_pretrained/results_vis/test_179_ibims/res_mat/test_order_nms_pred/
+```
 N.B. Each .npz file contains the first channel for occlusion boundary probability (0~127) and next eight channels of occlusion relationship
-w.r.t each pixel's eight neighbor pixels with label (1: occludes, -1: occluded, 0: no occlusion). The mapping from index to pixel neighbor is:<br/>
+w.r.t each pixel's eight neighbor pixels with label (1: occludes, -1: occluded, 0: no occlusion). The mapping from channel index to pixel neighbor is:<br/>
 1 2 3<br/>
 4 &nbsp;&nbsp; 5<br/>
 6 7 8<br/>
 ```shell
-# Please load using:
+# Please load the .npz file using:
 occ = numpy.load('file_path')['order']
 ```
+
+We also offer pairwise occlusion predictions directly to encourage using them in downstream tasks:
+
+Download pairwise occlusion predictions for iBims-1 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdxC6qiKGoHKXB0Lg?e=eUPsYS).
+
+Download pairwise occlusion predictions for NYUv2 [here](https://1drv.ms/u/s!AhUxUphMG7I4jYdyMeuvdCZyKE5OWw?e=Gann3f).
 
 ### 3.2 Depth Refinement with Detected Occlusion
 
@@ -190,7 +203,8 @@ python train.py --save_dir # save_model_path
 ```
 The whole training procedure can be finished in ~10 hours with a single TitanX GPU.
 
-### 5. Generate occlusion labels
+### 5. Generate Occlusion Labels
+You can generate the occlusion relationship label between immediate neighbor pixels using our method proposed in the paper. Please follow the instructions presented below:
 ```shell script
 # create data dir symbole link  
 cd DetectOcclusion/ && ln -s ../data/ data/ && cd utils

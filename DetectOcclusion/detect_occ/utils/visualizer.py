@@ -342,7 +342,6 @@ class MATLAB:
         self.out_root_dir = os.path.join(self.res_dir, 'res_mat')
         self.out_gt_dir = os.path.join(self.out_root_dir, 'test_gt')
         self.out_pred_dir = os.path.join(self.out_root_dir, 'test_pred')
-        self.out_order_dir = os.path.join(self.out_root_dir, 'test_order_pred')
 
         if 'nyu' in valset_name:
             self.org_gt_dir = os.path.join(curr_path, '../..', 'data/NYUv2_OR/data/')
@@ -357,6 +356,3 @@ class MATLAB:
         if not os.path.exists(self.out_root_dir): os.makedirs(self.out_root_dir)
         if not os.path.exists(self.out_gt_dir): os.makedirs(self.out_gt_dir)
         if not os.path.exists(self.out_pred_dir): os.makedirs(self.out_pred_dir)
-        if not os.path.exists(self.out_order_dir): os.makedirs(self.out_order_dir)
-
-

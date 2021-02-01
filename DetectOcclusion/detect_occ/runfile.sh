@@ -3,7 +3,7 @@
 python train_val.py --config ../experiments/configs/BSDSownership_order_myUnet_CCE_1.yaml --gpus 1
 
 # test from trained model for BSDSownership dataset
-python train_val.py --config ../experiments/configs/BSDSownership_order_myUnet_CCE_1.yaml --evaluate --resume 2020-01-15_15-40-52/checkpoint_19.pth.tar --gpus 0
+python train_val.py --config ../experiments/configs/BSDSownership_order_myUnet_CCE_1.yaml --evaluate --resume BSDSownership_pretrained/BSDSownership_epoch19.pth.tar --gpus 0
 
 # train from scratch for iBims1_OR dataset
 python train_val.py --config ../experiments/configs/ibims_order_myUnet_CCE_1.yaml --gpus 1
