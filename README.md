@@ -4,7 +4,7 @@ It contains two parts: the estimation of occlusion boundaries with directions an
 
 [[Project webpage]](http://imagine.enpc.fr/~qiux/P2ORM/) [[Paper]](https://arxiv.org/pdf/2007.12088.pdf) [[Supp.]](http://imagine.enpc.fr/~qiux/P2ORM/supp.pdf)
 
-News (2021-01-28): The code for occlusion label generation is released!
+News (2021-02-01): The code for occlusion label generation is released!
 
 News (2020-08-28): The code for training and test is released!
 
@@ -46,7 +46,6 @@ Given an initial depth prediction and the estimated occlusions as input, the mod
 ### 2.1 Dependencies
 The code has been tested on ubuntu 16.04 with a single GeForce GTX TITAN X (12GB). The main dependencies are: Python=3.6, 
 Pytorch>=1.1.0 and Torchvision>=0.3.0. Please install the PyTorch version based on your CUDA version.
-
 We recommend to utilize conda environment to install all dependencies and test the code.
 
 ```shell
@@ -95,15 +94,15 @@ Use the pretrained models and test them on three datasets. The models predict oc
 cd DetectOcclusion/ && ln -s ../data/ data/
 mkdir DetectOcclusion/output/  && cd detect_occ/ 
 
-# test on BSDSownership dataset
+# test on BSDSownership dataset and save results in ./DetectOcclusion/experiments/output/BSDSownership_pretrained/
 mkdir DetectOcclusion/output/BSDSownership_pretrained/  # and put pretrained model here
 python train_val.py --config ../experiments/configs/BSDSownership_order_myUnet_CCE_1.yaml --evaluate --resume BSDSownership_pretrained/BSDSownership_epoch19.pth.tar --gpus 0
 
-# test on iBims1_OR dataset
+# test on iBims1_OR dataset and save results in ./DetectOcclusion/experiments/output/iBims1_OR_pretrained/
 mkdir DetectOcclusion/output/iBims1OR_pretrained/  # and put pretrained model here
 python train_val.py --config ../experiments/configs/ibims_order_myUnet_CCE_1.yaml --evaluate --resume iBims1OR_pretrained/iBims1OR_epoch179.pth.tar --gpus 0
 
-# test on NYUv2_OR dataset
+# test on NYUv2_OR dataset and save results in ./DetectOcclusion/experiments/output/NYUv2_OR_pretrained/
 mkdir DetectOcclusion/output/NYUv2OR_pretrained/  # and put pretrained model here
 python train_val.py --config ../experiments/configs/nyuv2_order_myUnet_CCE_1.yaml --evaluate --resume NYUv2OR_pretrained/NYUv2OR_epoch74.pth.tar --gpus 0
 
