@@ -33,13 +33,13 @@ If our project is helpful for your research, please consider citing :
 ### 1.1 Occlusion boundary and orientation estimation
 Given an image as input, the model predicts occlusion status between neighbor pixels which can be converted to occlusion boundaries with orientations (the left-side of a green arrow is the occlusion foreground). In the predictions, green color indicates the correctly estimated boundaries.
 <p align="center">
-<img src="https://github.com/tim885/P2ORM/blob/develop/img/occ_vis_bsds_new.png" width="1490px" alt="occ_vis">
+<img src="https://github.com/tim885/P2ORM/blob/master/img/occ_vis_bsds_new.png" width="1490px" alt="occ_vis">
 </p>
 
 ### 1.2 Depth map refinement
 Given an initial depth prediction and the estimated occlusions as input, the model predicts a refined depth map.
 <p align="center">
-<img src="https://github.com/tim885/P2ORM/blob/develop/img/depth_vis_nyudv2_new.png" width="1490px" alt="depth_vis">
+<img src="https://github.com/tim885/P2ORM/blob/master/img/depth_vis_nyudv2_new.png" width="1490px" alt="depth_vis">
 </p>
 
 ## 2. Installation
