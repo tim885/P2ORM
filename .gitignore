@@ -1,9 +1,10 @@
 
 # dirs
 .idea
+data/
+DetectOcclusion/experiments/output/
+DetectOcclusion/data/
 
-DetectOcclusion/experiments/output
-DetectOcclusion/data
 
 # file types
 *.pyc
