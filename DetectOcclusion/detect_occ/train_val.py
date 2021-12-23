@@ -4,6 +4,8 @@
 # Written by Xuchong Qiu
 # --------------------------------------------------------
 
+# Script for model train/val 
+
 from __future__ import print_function, division
 import time
 import argparse
