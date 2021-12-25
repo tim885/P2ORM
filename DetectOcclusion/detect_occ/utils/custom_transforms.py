@@ -15,7 +15,7 @@ PI = 3.1416
 
 # ------------------------------------- data pre-processing and augmentation ----------------------------------------- #
 def get_data_transforms(config):
-    """data transforms and augmentation for train/val"""
+    """data transforms and augmentations for train/val"""
     # train input transform
     train_input_transf_list = []
     if config.dataset.color_jittering:
@@ -51,36 +51,56 @@ def get_data_transforms(config):
     return train_input_transf, train_co_transf, val_co_transf
 
 
+def infer_data_transforms(config):
+    """input data transforms for model inference"""
+    infer_input_transf_list = []
+    if len(config.dataset.test_fix_crop) == 4:
+        infer_input_transf_list += [FixCrop(config, phase='test', transf_gt=False)]
+    if config.dataset.norm_image:
+        infer_input_transf_list += [
+            Normalize(mean=config.dataset.pixel_means, std=config.dataset.pixel_stds, transf_gt=False)
+        ]
+    infer_input_transf_list += [ToTensor(config, transf_gt=False)]
+    infer_input_transf = transforms.Compose(infer_input_transf_list)
+
+    return infer_input_transf
+
+
 class Normalize(object):
     """Normalize a tensor image with mean and standard deviation.
     Args:
         mean (tuple): means for each channel.
         std (tuple): standard deviations for each channel.
     """
-    def __init__(self, mean=(0., 0., 0.), std=(1., 1., 1.)):
+    def __init__(self, mean=(0., 0., 0.), std=(1., 1., 1.), transf_gt=True):
         self.mean = mean
         self.std = std
+        self.transf_gt = transf_gt
 
     def __call__(self, sample):
         """return normalized numpy array"""
         img   = sample['image']
-        masks = sample['label']  # list of mask
-
         img  = np.array(img)[:, :, :3].astype(np.float32)  # if RGBA => RGB
         img /= 255.0  # => [0,1]
         img -= self.mean
         img /= self.std
+        
+        if self.transf_gt:
+            # also transform ground truths
+            masks = sample['label']  # list of mask
+            for idx, _ in enumerate(masks):
+                masks[idx] = np.array(masks[idx]).astype(np.float32)
 
-        for idx, _ in enumerate(masks):
-            masks[idx] = np.array(masks[idx]).astype(np.float32)
-
-        return {'image': img, 'label': masks}
+            return {'image': img, 'label': masks}
+        else:
+            return {'image': img}
 
 
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
-    def __init__(self, config):
+    def __init__(self, config, transf_gt=True):
         self.config = config
+        self.transf_gt = transf_gt
 
     def __call__(self, sample):
         """
@@ -90,8 +110,7 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C x H x W
         img   = sample['image']
-        labels = sample['label']
-
+        
         if isinstance(img, np.ndarray):
             # img = img.astype(np.float32)  # C,H,W
             img = img.astype(np.float32).transpose((2, 0, 1))  # H,W,C => C,H,W
@@ -102,17 +121,21 @@ class ToTensor(object):
         else:
             img = torch.from_numpy(img).float()  # C,H,W
 
-        if self.config.network.task_type == 'occ_order':
-            for idx, _ in enumerate(labels):
-                labels[idx] = np.array(labels[idx]).astype(np.float32)
-                labels[idx] = torch.from_numpy(labels[idx]).long()
-        elif self.config.network.task_type == 'occ_ori':
-            occ_ori  = np.array(labels[0]).astype(np.float32)
-            occ_edge = np.array(labels[1]).astype(np.float32)
-            labels[0] = torch.from_numpy(occ_ori).float()
-            labels[1] = torch.from_numpy(occ_edge).long()
-
-        return {'image': img, 'label': labels}
+        if self.transf_gt:
+            # also transform ground truth
+            labels = sample['label']
+            if self.config.network.task_type == 'occ_order':
+                for idx, _ in enumerate(labels):
+                    labels[idx] = np.array(labels[idx]).astype(np.float32)
+                    labels[idx] = torch.from_numpy(labels[idx]).long()
+            elif self.config.network.task_type == 'occ_ori':
+                occ_ori  = np.array(labels[0]).astype(np.float32)
+                occ_edge = np.array(labels[1]).astype(np.float32)
+                labels[0] = torch.from_numpy(occ_ori).float()
+                labels[1] = torch.from_numpy(occ_edge).long()
+            return {'image': img, 'label': labels}
+        else:
+            return {'image': img}
 
 
 class OrderRandomHorizontalFlip(object):
@@ -224,7 +247,7 @@ class RandomGaussianBlur(object):
 
 
 class FixCrop(object):
-    def __init__(self, config, phase):
+    def __init__(self, config, phase, transf_gt=True):
         self.config = config
         if phase == 'train':
             self.fix_crop = config.dataset.train_fix_crop  # [H_min, H_max, W_min, W_max]
@@ -232,6 +255,7 @@ class FixCrop(object):
             self.fix_crop = config.dataset.test_fix_crop  # [H_min, H_max, W_min, W_max]
         else:
             raise ValueError('phase is not defined!')
+        self.transf_gt = transf_gt
 
     def __call__(self, sample):
         """
@@ -239,17 +263,19 @@ class FixCrop(object):
         :param sample: {'image':, 'label':list}
         """
         img = sample['image']
-        labels = sample['label']
-
         if isinstance(img, np.ndarray):
             img = img[self.fix_crop[0]:self.fix_crop[1], self.fix_crop[2]:self.fix_crop[3]]
         else:
             img = img.crop((self.fix_crop[2], self.fix_crop[0], self.fix_crop[3], self.fix_crop[1]))
 
-        for idx, label in enumerate(labels):
-            labels[idx] = label.crop((self.fix_crop[2], self.fix_crop[0], self.fix_crop[3], self.fix_crop[1]))
-
-        return {'image': img, 'label': labels}
+        if self.transf_gt:
+            # also transform ground truths
+            labels = sample['label']
+            for idx, label in enumerate(labels):
+                labels[idx] = label.crop((self.fix_crop[2], self.fix_crop[0], self.fix_crop[3], self.fix_crop[1]))
+            return {'image': img, 'label': labels}
+        else: 
+            return {'image': img}
 
 
 class RandomCrop(object):
@@ -314,16 +340,16 @@ class RandomCrop(object):
 
 
 # --------------------------------------------Data Conversion Tools -------------------------------------------------- #
-def resize_to_origin(net_in, net_out, target, config):
+def resize_to_origin(net_in, net_out, hw_org, config):
     """
-    resize net input/output to original image size offered by target
+    resize net input/output to original image size offered by target if input is resized before loaded into model
     :param net_in: tensor; N,3,H,W
     :param net_out: tensor; N,C,H,W
-    :param target: tensor; N,H,W
+    :param hw_org: list; input original spatial size
     :return: 
     """
     N, C, H, W = net_out.shape
-    _, H_org, W_org = target.shape
+    H_org, W_org = hw_org
 
     if config.TEST.img_padding:
         # center crop if using reflect padding

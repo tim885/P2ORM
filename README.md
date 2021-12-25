@@ -139,7 +139,7 @@ Download pairwise occlusion predictions for NYUv2 [here](https://1drv.ms/u/s!AhU
 #### 3.1.3 Inference
 Load model and do inference on images without evaluation, only model outputs and qualitative results are saved. 
 ```bash
-python infer.py --config ../experiments/configs/BSDSownership_order_myUnet_CCE_1.yaml --evaluate --resume BSDSownership_pretrained/BSDSownership_epoch19.pth.tar --gpus 0
+python infer.py --config ../experiments/configs/BSDSownership_order_myUnet_CCE_1.yaml --resume BSDSownership_pretrained/BSDSownership_epoch19.pth.tar --gpus 0
 ```
 
 ### 3.2 Depth Refinement with Detected Occlusion

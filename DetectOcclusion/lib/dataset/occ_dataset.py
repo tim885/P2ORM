@@ -16,7 +16,11 @@ PI = 3.1416
 
 
 class ImgToOccDataset(data.Dataset):
-    """generic dataset loader for occlusion edge/ori/order estimation from image"""
+    """
+    Generic train/val/test dataset loader for occlusion edge/ori/order estimation from image. 
+    Both input images and the corresponding ground truths are needed. 
+    """
+
     def __init__(self, csv_file, config, isTest=False, input_transf=None, target_transf=None, co_transf=None):
         self.samples = pd.read_csv(csv_file)
         self.input_transform = input_transf
@@ -90,6 +94,45 @@ class ImgToOccDataset(data.Dataset):
     def __len__(self):
         return self.samples.__len__()
 
+
+class InferenceDataset(data.Dataset):
+    """
+    Generic inference dataset loader for occlusion edge/ori/order estimation from image. 
+    Only input images are needed. 
+    """
+
+    def __init__(self, csv_file, config, input_transf=None):
+        self.samples = pd.read_csv(csv_file)
+        self.input_transform = input_transf
+        self.config = config
+
+    def __getitem__(self, idx):
+        # load sample data
+        img_path = os.path.join(self.config.root_path, self.samples.iloc[idx, 0])
+        img = Image.open(img_path, 'r')
+        img_org_hw = [img.size[1], img.size[0]]  # H,W
+
+        # make net load size as multiplier of minSize
+        H_load, W_load = get_net_loadsz(img_org_hw, self.config.network.scale_down)
+        if self.config.TEST.img_padding:  # reflect pad for paired img size
+            pad_H = int((H_load - img_org_hw[0]) / 2)
+            pad_W = int((W_load - img_org_hw[1]) / 2)
+            reflect_pad = F.Pad((pad_W, pad_H), padding_mode='reflect')
+            img = reflect_pad(img)
+        else:  # resize img to fit net input size
+            img = img.resize((W_load, H_load), Image.LANCZOS)
+
+        # transforms and data augmentation
+        if self.input_transform is not None: 
+            input_dict = {'image': img}
+            input_dict = self.input_transform(input_dict)
+            img = input_dict['image']
+
+        sample = ((img), img_path, img_org_hw)
+        return sample
+
+    def __len__(self):
+        return self.samples.__len__()
 
 def get_net_loadsz(org_img_sz, minSize):
     """

@@ -24,16 +24,13 @@ sys.path.append('..')
 import models
 from utils.utility import save_checkpoint, AverageMeter, kaiming_init
 from utils.config import config, update_config
-from utils.compute_loss import get_criterion, cal_loss
-from utils.metrics import MetricsEvaluator
-from utils.visualizer import viz_and_log, viz_and_save, plot_train_metrics, plot_val_metrics
-from utils.custom_transforms import get_data_transforms, resize_to_origin
+from utils.visualizer import viz_and_log, viz_and_save
+from utils.custom_transforms import infer_data_transforms, resize_to_origin
 from lib.logger.create_logger import create_logger
 from lib.logger.print_and_log import print_and_log
-from lib.dataset.occ_dataset import ImgToOccDataset
+from lib.dataset.occ_dataset import InferenceDataset
 
-model_names = sorted(name for name in models.__dict__
-                     if name.islower() and not name.startswith("__"))
+model_names = sorted(name for name in models.__dict__ if name.islower() and not name.startswith("__"))
 
 
 def parse_args():
@@ -47,7 +44,6 @@ def parse_args():
     parser.add_argument('--resume', default='', type=str, metavar='PATH', help='path to latest checkpoint (default: none)')
     parser.add_argument('--new_val', action='store_true', help='new val with resumed model, re-calculate val perf ')
     parser.add_argument('--out_dir', default='', type=str, metavar='PATH', help='res output dir(defaut: output/date)')
-    parser.add_argument('--evaluate', action='store_true', help='test with best model in validation')
     parser.add_argument('--frequent', default=config.default.frequent, type=int, help='frequency of logging')
     parser.add_argument('--gpus', help='specify the gpu to be use', default='3', required=False, type=str)
     parser.add_argument('--cpu', default=False, required=False, type=bool, help='whether use cpu mode')
@@ -62,7 +58,6 @@ def parse_args():
 
 args = parse_args()
 curr_path = os.path.abspath(os.path.dirname(__file__))
-n_iter = 0  # train iter num
 best_perf = 0
 
 
@@ -83,7 +78,7 @@ def main():
     logger.info('[INFO] Called with args {}'.format(args))
     logger.info('[INFO] Called with config {}'.format(config))
 
-    print_and_log('=> will save everything to {}'.format(save_path), logger)
+    print_and_log('[INFO] will save everything to {}'.format(save_path), logger)
     if not os.path.exists(save_path): os.makedirs(save_path)
 
     # copy curr cfg file to output dir
@@ -113,68 +108,62 @@ def main():
     cudnn.benchmark = False  # True if fixed train/val input size
     print('[INFO] cudnn.deterministic flag:', cudnn.deterministic)
 
-    if args.resume:  # optionally resume from a checkpoint with trained model or train from scratch
-        model_path = os.path.join(output_path, args.resume)
-        if os.path.isfile(model_path):
-            print("[INFO] Loading resumed model '{}'".format(model_path))
-            resumed_model = torch.load(model_path, map_location=lambda storage, loc: storage.cuda(args.gpus[0]))
-            model.load_state_dict(resumed_model['state_dict'])
-            config.TRAIN.begin_epoch = resumed_model['epoch']
-            best_perf    = resumed_model['best_perf']
-            train_losses = resumed_model['train_losses']
-            date_time    = resumed_model['date_time']  # date of beginning
-            print("[INFO] Loaded resumed model '{}' (epoch {})".format(args.resume, resumed_model['epoch']))
-            if config.TRAIN.end_epoch > len(train_losses):  # resume training with more epochs
-                train_losses = np.append(train_losses, np.zeros([config.TRAIN.end_epoch - len(train_losses)]))
-        else:
-            print("[INFO] No checkpoint found at '{}'".format(args.resume))
-            return
+    # resume from a checkpoint with trained model
+    model_path = os.path.join(output_path, args.resume)
+    if os.path.isfile(model_path):
+        print("[INFO] Loading resumed model '{}'".format(model_path))
+        resumed_model = torch.load(model_path, map_location=lambda storage, loc: storage.cuda(args.gpus[0]))
+        model.load_state_dict(resumed_model['state_dict'])
+        config.TRAIN.begin_epoch = resumed_model['epoch']
+        best_perf    = resumed_model['best_perf']
+        train_losses = resumed_model['train_losses']
+        print("[INFO] Loaded resumed model '{}' (epoch {})".format(args.resume, resumed_model['epoch']))
+        if config.TRAIN.end_epoch > len(train_losses):  # resume training with more epochs
+            train_losses = np.append(train_losses, np.zeros([config.TRAIN.end_epoch - len(train_losses)]))
     else:
-        train_losses = np.zeros(config.TRAIN.end_epoch)
-        date_time = curr_time
+        print("[INFO] No checkpoint found at '{}'".format(args.resume))
+        return
 
     # --------------------------------- inference on test set from resumed model ---------------------------------------- #
-    if args.evaluate:
-        print_and_log('[INFO] evaluation mode', logger)
-        test_csv = os.path.join(curr_path, '..', config.dataset.test_image_set)
-        _, _, test_co_transf = get_data_transforms(config)
-        test_dataset = ImgToOccDataset(test_csv, config, True, None, None, test_co_transf)
-        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, num_workers=args.workers,
-                                                  pin_memory=True, shuffle=False)
-        print_and_log('[INFO] {} test samples'.format(len(test_dataset)), logger)
+    print_and_log('[INFO] evaluation mode', logger)
+    infer_csv = os.path.join(curr_path, '..', config.dataset.infer_image_set)
+    input_transf = infer_data_transforms(config)
+    infer_dataset = InferenceDataset(infer_csv, config, input_transf)
+    infer_loader = torch.utils.data.DataLoader(
+        infer_dataset, batch_size=1, num_workers=args.workers, pin_memory=True, shuffle=False
+    )
+    print_and_log('[INFO] {} test samples'.format(len(infer_dataset)), logger)
 
-        epoch = config.TRAIN.begin_epoch
-        test_vis_writers = []
-        for i in range(4):
-            test_vis_writers.append(SummaryWriter(os.path.join(save_path, 'test_vis', str(i))))
-        results_vis_path = os.path.join(save_path, 'results_vis')
-        print('[INFO] Save visual results to {}'.format(results_vis_path))
-        if not os.path.exists(results_vis_path): os.makedirs(results_vis_path)
+    infer_vis_writers = []
+    for i in range(4):
+        infer_vis_writers.append(SummaryWriter(os.path.join(save_path, 'test_vis', str(i))))
+    results_vis_path = os.path.join(save_path, 'results_vis')
+    print('[INFO] Save visual results to {}'.format(results_vis_path))
+    if not os.path.exists(results_vis_path): os.makedirs(results_vis_path)
 
-        inference(test_loader, model, test_vis_writers, logger, save_path, config)
+    inference(infer_loader, model, infer_vis_writers, logger, save_path, config)
 
-        print_and_log('[INFO] Inference is finished.'.format(len(test_dataset)), logger)
+    print_and_log('[INFO] Inference is finished.'.format(len(infer_dataset)), logger)
 
-        return
+    return
     # ---------------------------------------------------------------------------------------------------------------- #
 
 
-def inference(val_loader, model, output_writers, logger, res_path, config, isTest=True):
+def inference(infer_loader, model, viz_writers, logger, res_path, config):
     global args
     batch_time = AverageMeter()
     data_time  = AverageMeter()
 
-    batch_num = len(val_loader)
+    batch_num = len(infer_loader)
     model.eval()
     with torch.no_grad():
         end = time.time()
 
-        for batch_idx, (inputs, targets, img_path) in enumerate(tqdm(val_loader)):
+        for batch_idx, (inputs, img_path, hw_org) in enumerate(tqdm(infer_loader)):
             data_time.update(time.time() - end)
 
             # load data
             net_in  = inputs.cuda(args.gpus[0], non_blocking=True)
-            targets = [target.cuda(args.gpus[0], non_blocking=True) for target in targets]
 
             # forward
             net_out = model(net_in)
@@ -183,15 +172,14 @@ def inference(val_loader, model, output_writers, logger, res_path, config, isTes
             end = time.time()
 
             # resize img and model output if needed
-            net_in, net_out = resize_to_origin(net_in, net_out, targets[0], config)
+            net_in, net_out = resize_to_origin(net_in, net_out, hw_org, config)
 
-            if batch_idx < len(output_writers):  # visualize samples from first batches
-                viz_and_log(net_in, net_out, targets, output_writers, batch_idx, 0, config)
+            if batch_idx < len(viz_writers):  # visualize samples from first batches
+                viz_and_log(net_in, net_out, targets=None, viz_writers=viz_writers, 
+                            idx=batch_idx, epoch=0, config=config, w_target=False)
 
             # save every sample
-            if isTest:
-                out_path = os.path.join(res_path, 'results_vis')
-                viz_and_save(net_in, net_out, img_path, out_path, config, epoch=0)
+            viz_and_save(net_in, net_out, img_path, res_path, config, epoch=0)
 
             # log curr batch info
             if batch_idx % config.default.frequent == 0:

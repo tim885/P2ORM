@@ -72,12 +72,13 @@ def plot_val_metrics(val_writer, config, epoch, val_loss, val_mIoUs, val_mF1s, v
         val_writer.add_scalar('meanF1_edge', val_mF1s[0], epoch)
 
 
-def viz_and_log(inputs, net_out, targets, viz_writers, idx, epoch, config):
+def viz_and_log(inputs, net_out, targets, viz_writers, idx, epoch, config, w_target=True):
     """
     visualize train/val samples on tensorboard
     :param inputs: network input, tensor, N,C,H,W
     :param net_out: network input, tensor, N,C,H,W
     :param targets: tuple, (N,H,W ; N,H,W)
+    :param w_target: bool, whether with ground truths (target)
     """
     # viz model input
     mean_values = torch.tensor(config.dataset.pixel_means, dtype=inputs.dtype).view(3, 1, 1)
@@ -87,48 +88,56 @@ def viz_and_log(inputs, net_out, targets, viz_writers, idx, epoch, config):
     viz_writers[idx].add_image('Input', model_in_vis, epoch)
 
     if config.network.task_type == 'occ_order':
-        edge_gt = targets[-1].unsqueeze(1).float()  # N,1,H,W
-
         # gen occ order pred
-        order_gt_E = targets[0][0, :, :].view(-1, H, W).cpu()  # 1,H,W
-        order_gt_S = targets[1][0, :, :].view(-1, H, W).cpu()
         _, ind_pred_h = net_out[0, :3, :, :].topk(1, dim=0, largest=True, sorted=True)  # 1,H,W
         _, ind_pred_v = net_out[0, 3:6, :, :].topk(1, dim=0, largest=True, sorted=True)
+        if w_target:
+            order_gt_E = targets[0][0, :, :].view(-1, H, W).cpu()  # 1,H,W
+            order_gt_S = targets[1][0, :, :].view(-1, H, W).cpu()
+
         if config.dataset.connectivity == 8:
-            order_gt_SE = targets[2][0, :, :].view(-1, H, W).cpu()  # 1,H,W
-            order_gt_NE = targets[3][0, :, :].view(-1, H, W).cpu()
             _, ind_pred_SE = net_out[0, 6:9, :, :].topk(1, dim=0, largest=True, sorted=True)  # 1,H,W
             _, ind_pred_NE = net_out[0, 9:12, :, :].topk(1, dim=0, largest=True, sorted=True)
+            if w_target:
+                order_gt_SE = targets[2][0, :, :].view(-1, H, W).cpu()  # 1,H,W
+                order_gt_NE = targets[3][0, :, :].view(-1, H, W).cpu()
 
         # gen occ edge prob from occ order
         edge_prob_pred, _ = occ_order_pred_to_edge_prob(net_out, config.dataset.connectivity)  # N,1,H,W
 
         # plot
-        viz_writers[idx].add_image('occ_order_E.1.gt', order_gt_E.float() / 2, epoch)
-        viz_writers[idx].add_image('occ_order_S.1.gt', order_gt_S.float() / 2, epoch)
         viz_writers[idx].add_image('occ_order_E.2.pred', ind_pred_h.float() / 2, epoch)
         viz_writers[idx].add_image('occ_order_S.2.pred', ind_pred_v.float() / 2, epoch)
+        if w_target:
+            viz_writers[idx].add_image('occ_order_E.1.gt', order_gt_E.float() / 2, epoch)
+            viz_writers[idx].add_image('occ_order_S.1.gt', order_gt_S.float() / 2, epoch)
+
         if config.dataset.connectivity == 8:
-            viz_writers[idx].add_image('occ_order_SE.1.gt', order_gt_SE.float() / 2, epoch)
-            viz_writers[idx].add_image('occ_order_NE.1.gt', order_gt_NE.float() / 2, epoch)
             viz_writers[idx].add_image('occ_order_SE.2.pred', ind_pred_SE.float() / 2, epoch)
             viz_writers[idx].add_image('occ_order_NE.2.pred', ind_pred_NE.float() / 2, epoch)
+            if w_target:
+                viz_writers[idx].add_image('occ_order_SE.1.gt', order_gt_SE.float() / 2, epoch)
+                viz_writers[idx].add_image('occ_order_NE.1.gt', order_gt_NE.float() / 2, epoch)
 
-        viz_writers[idx].add_image('Occ_edge.1.gt', edge_gt[0], epoch)
         viz_writers[idx].add_image('Occ_edge.2.pred', edge_prob_pred[0], epoch)
+        if w_target:
+            edge_gt = targets[-1].unsqueeze(1).float()  # N,1,H,W
+            viz_writers[idx].add_image('Occ_edge.1.gt', edge_gt[0], epoch)
 
     elif config.network.task_type == 'occ_ori':
-        edge_gt        = targets[-1].unsqueeze(1).float()  # N,1,H,W
         edge_prob_pred = net_out[:, 0, :, :].unsqueeze(1)  # N,1,H,W
-        ori_gt = targets[0].unsqueeze(1).float()  # N,1,H,W
-        ori_gt = (torch.clamp(ori_gt, -PI, PI) + PI) / PI / 2  # [-PI,PI] => [0,1]
         ori_pred = net_out[:, 1, :, :].unsqueeze(1)  # N,1,H,W
         ori_pred = (torch.clamp(ori_pred, -PI, PI) + PI) / PI / 2  # [-PI,PI] => [0,1]
+        if w_target:
+            edge_gt = targets[-1].unsqueeze(1).float()  # N,1,H,W
+            ori_gt = targets[0].unsqueeze(1).float()  # N,1,H,W
+            ori_gt = (torch.clamp(ori_gt, -PI, PI) + PI) / PI / 2  # [-PI,PI] => [0,1]
 
-        viz_writers[idx].add_image('Occ_edge.1.gt', edge_gt[0], epoch)
         viz_writers[idx].add_image('Occ_edge.2.pred', edge_prob_pred[0], epoch)
-        viz_writers[idx].add_image('occ_ori.1.gt', ori_gt[0], epoch)
         viz_writers[idx].add_image('occ_ori.2.pred', ori_pred[0], epoch)
+        if w_target:
+            viz_writers[idx].add_image('Occ_edge.1.gt', edge_gt[0], epoch)
+            viz_writers[idx].add_image('occ_ori.1.gt', ori_gt[0], epoch)
 
 
 def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
@@ -139,6 +148,7 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
 
     # set res dirs and paths
     valset_name = config.dataset.test_dataset
+    out_dir = os.path.join(out_dir, 'results_vis')
     root_eval_dir = os.path.join(out_dir, 'test_{}_{}'.format(epoch, valset_name))
     lbl_eval_dir = os.path.join(root_eval_dir, 'res_mat')
     img_eval_dir = os.path.join(root_eval_dir, 'images')

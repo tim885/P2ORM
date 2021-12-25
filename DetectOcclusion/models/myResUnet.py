@@ -57,7 +57,7 @@ class ResUnetModel(nn.Module):
         elif encoder_arch == 'resnet18':
             self.encoder = resnet18(pretrained=pretrained)
         if pretrained:
-            print('=> load imagenet pretrained weights')
+            print('[INFO] load imagenet pretrained weights')
 
         # bottleneck
         self.middle = DoubleConvBlock(in_nc=1024, mid_nc=512, out_nc=512, use_bias=True)

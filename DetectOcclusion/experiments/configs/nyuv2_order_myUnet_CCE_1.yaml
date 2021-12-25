@@ -9,6 +9,7 @@ dataset:
   train_image_set: 'data/InteriorNet_OR/image_sets/occ_order_raycastingV2NYU_train.txt'
   val_image_set: 'data/NYUv2_OR/image_sets/occ_order_raycasting_woNormal_avgROI_1mm_val.txt'
   test_image_set: 'data/NYUv2_OR/image_sets/occ_order_raycasting_woNormal_avgROI_1mm_val.txt'
+  infer_image_set: ''
   flip: True  # horizontal flip image and label
   color_jittering: True
   rand_blur_rate: 0.5  # random image blurring upper bound rate

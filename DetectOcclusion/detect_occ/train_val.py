@@ -368,7 +368,8 @@ def val_epoch(val_loader, model, criterion, epoch, output_writers, logger, res_p
             end = time.time()
 
             # resize img and model output if needed
-            net_in, net_out = resize_to_origin(net_in, net_out, targets[0], config)
+            hw_org = targets[0].shape[-2:]
+            net_in, net_out = resize_to_origin(net_in, net_out, hw_org, config)
 
             # cal loss
             total_loss, loss_list = cal_loss(criterion, net_out, targets, config)
@@ -382,8 +383,7 @@ def val_epoch(val_loader, model, criterion, epoch, output_writers, logger, res_p
 
             # save every sample
             if isTest or (epoch + 1) % config.TRAIN.test_step == 0:
-                out_path = os.path.join(res_path, 'results_vis')
-                viz_and_save(net_in, net_out, img_path, out_path, config, epoch)
+                viz_and_save(net_in, net_out, img_path, res_path, config, epoch)
 
             # log curr batch info
             if batch_idx % config.default.frequent == 0:
