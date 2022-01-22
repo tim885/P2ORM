@@ -114,7 +114,7 @@ def main():
         print("[INFO] Loading resumed model '{}'".format(model_path))
         resumed_model = torch.load(model_path, map_location=lambda storage, loc: storage.cuda(args.gpus[0]))
         model.load_state_dict(resumed_model['state_dict'])
-        config.TRAIN.begin_epoch = resumed_model['epoch']
+        epoch = resumed_model['epoch']
         best_perf    = resumed_model['best_perf']
         train_losses = resumed_model['train_losses']
         print("[INFO] Loaded resumed model '{}' (epoch {})".format(args.resume, resumed_model['epoch']))
@@ -141,7 +141,7 @@ def main():
     print('[INFO] Save visual results to {}'.format(results_vis_path))
     if not os.path.exists(results_vis_path): os.makedirs(results_vis_path)
 
-    inference(infer_loader, model, infer_vis_writers, logger, save_path, config)
+    inference(infer_loader, model, infer_vis_writers, logger, save_path, config, epoch)
 
     print_and_log('[INFO] Inference is finished.'.format(len(infer_dataset)), logger)
 
@@ -149,7 +149,7 @@ def main():
     # ---------------------------------------------------------------------------------------------------------------- #
 
 
-def inference(infer_loader, model, viz_writers, logger, res_path, config):
+def inference(infer_loader, model, viz_writers, logger, res_path, config, epoch):
     global args
     batch_time = AverageMeter()
     data_time  = AverageMeter()
@@ -174,17 +174,18 @@ def inference(infer_loader, model, viz_writers, logger, res_path, config):
             # resize img and model output if needed
             net_in, net_out = resize_to_origin(net_in, net_out, hw_org, config)
 
-            if batch_idx < len(viz_writers):  # visualize samples from first batches
+            # visualize samples from first batches
+            if batch_idx < len(viz_writers):  
                 viz_and_log(net_in, net_out, targets=None, viz_writers=viz_writers, 
-                            idx=batch_idx, epoch=0, config=config, w_target=False)
+                            idx=batch_idx, epoch=epoch, config=config, w_target=False)
 
             # save every sample
-            viz_and_save(net_in, net_out, img_path, res_path, config, epoch=0)
+            viz_and_save(net_in, net_out, img_path, res_path, config, epoch)
 
             # log curr batch info
             if batch_idx % config.default.frequent == 0:
                 val_info = 'Val_Epoch: [{}][{}/{}]\t Time {}\t DataTime {}\t '\
-                           .format(0, batch_idx, batch_num, batch_time, data_time)
+                           .format(epoch, batch_idx, batch_num, batch_time, data_time)
                 print_and_log(val_info, logger)
 
             if batch_idx >= batch_num: break

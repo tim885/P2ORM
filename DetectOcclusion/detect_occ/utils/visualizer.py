@@ -244,7 +244,7 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
             Image.fromarray(((occ_order_pair_nms[:, :, 3]+1)/2.*255.).astype(np.uint8), mode='L').save(occ_order_NE_nms_path)
 
             # save pixel-wise occ_order after nms
-            occ_order_nms_dir = os.path.join(lbl_eval_dir, 'test_order_nms_pred')
+            occ_order_nms_dir = os.path.join(lbl_eval_dir, 'test_order_nms_pred', img_abs_path[0].split('/')[-3])
             if not os.path.exists(occ_order_nms_dir):
                 os.makedirs(occ_order_nms_dir)
             occ_order_pix_nms_path = os.path.join(occ_order_nms_dir, '{}-order-pix.npz'.format(img_name))

@@ -1,9 +1,10 @@
 
 # dirs
 .idea
-data/
-DetectOcclusion/experiments/output/
-DetectOcclusion/data/
+data
+DetectOcclusion/experiments/output
+DetectOcclusion/data
+DetectOcclusion/lib/dataset/build
 
 
 # file types

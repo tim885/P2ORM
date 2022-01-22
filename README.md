@@ -76,7 +76,14 @@ Download InteriorNet.zip [here](https://1drv.ms/u/s!AhUxUphMG7I4jaNF_Sot5YV39ja9
 
 N.B. The file is used only for a demonstration, please refer to [here](https://interiornet.org/) for the whole dataset.
 
-####
+#### 2.2.3 Prepare your own csv file
+Currently the code uses package `pandas` and csv file to read file paths for each sample. The `csv_file.txt` follows format:
+```text
+#image_path,label1_path,label2_path
+sample1_image_path,sample1_label1_path,sample1_label2_path
+sample2_image_path,sample2_label1_path,sample2_label2_path
+...
+```
 
 ## 3. Evaluation
 ### 3.1 Pixel-Pair Occlusion Detection
@@ -139,7 +146,7 @@ Download pairwise occlusion predictions for NYUv2 [here](https://1drv.ms/u/s!AhU
 #### 3.1.3 Inference
 Load model and do inference on images without evaluation, only model outputs and qualitative results are saved. 
 ```bash
-python infer.py --config ../experiments/configs/BSDSownership_order_myUnet_CCE_1.yaml --resume BSDSownership_pretrained/BSDSownership_epoch19.pth.tar --gpus 0
+python infer.py --config ../experiments/configs/DenseDepthNYUv2_order_myUnet_CCE_1.yaml --resume nyuv2_order_myUnet_MaskCCE_1_2020-01-15_23-30-16/checkpoint_74.pth.tar --gpus 1
 ```
 
 ### 3.2 Depth Refinement with Detected Occlusion
