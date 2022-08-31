@@ -618,13 +618,16 @@ def depth_point2plane(depth, fx, fy):
 
 
 # ================================ functions for label conversion in train/val ======================================= #
-def occ_order_pred_to_edge_prob(net_out, connectivity=4):
+def occ_order_pred_to_edge_prob(net_out, config):
     """
     edge-wise occ order prediction to pixel-wise occ edge probability and pairwise occ order probability (occ exists)
     :param net_out: net occ order prediction; N,C,H,W ; tensor
     :return: occ_edge_prob, Nx1xHxW, [0~1]; occ_order_exist_prob, Nx2xHxW or Nx4xHxW, [0~1]
     """
     # softmax
+    connectivity = config.dataset.connectivity
+    give_independent_prob = True  # FIXME
+
     occ_order_E_prob_pairwise = F.softmax(net_out[:, 0:3, :, :], dim=1)  # N,1,H,W
     occ_order_S_prob_pairwise = F.softmax(net_out[:, 3:6, :, :], dim=1)  # N,1,H,W
     non_occ_prob_E_pairwise = occ_order_E_prob_pairwise[:, 1, :, :].unsqueeze(1)  # N,1,H,W
@@ -638,19 +641,19 @@ def occ_order_pred_to_edge_prob(net_out, connectivity=4):
     # average to get pixel-wise occ_edge_prob and pairwise occ_order_exist_prob along each inclination
     if connectivity == 4:
         non_occ_order_probs = torch.cat((non_occ_prob_E_pairwise, non_occ_prob_S_pairwise), 1)  # N,2,H,W
-        occ_edge_prob = order_prob_to_edge_prob(non_occ_order_probs)
+        occ_edge_prob_list = order_prob_to_edge_prob(non_occ_order_probs, give_independent_prob)
         occ_order_exist_prob = torch.cat((1 - non_occ_prob_E_pairwise, 1 - non_occ_prob_S_pairwise), 1)  # N,2,H,W
     elif connectivity == 8:
         non_occ_order_probs = torch.cat((non_occ_prob_E_pairwise, non_occ_prob_S_pairwise,
                                          non_occ_prob_SE_pairwise, non_occ_prob_NE_pairwise), 1)  # N,4,H,W
-        occ_edge_prob = order_prob_to_edge_prob(non_occ_order_probs)
+        occ_edge_prob_list = order_prob_to_edge_prob(non_occ_order_probs, give_independent_prob)
         occ_order_exist_prob = torch.cat((1 - non_occ_prob_E_pairwise, 1 - non_occ_prob_S_pairwise,
                                           1 - non_occ_prob_SE_pairwise, 1 - non_occ_prob_NE_pairwise), 1)  # N,4,H,W
+    
+    return occ_edge_prob_list, occ_order_exist_prob
 
-    return occ_edge_prob, occ_order_exist_prob
 
-
-def order_prob_to_edge_prob(nonocc_order_prob):
+def order_prob_to_edge_prob(nonocc_order_prob, output_independent_prob=False):
     """
     convert pairwise occ order prob to pixel-wise occ edge prob by average
     :param nonocc_order_prob: occ order prob for non-occlusion; Nx2xHxW or Nx4xHxW; tensor
@@ -676,11 +679,10 @@ def order_prob_to_edge_prob(nonocc_order_prob):
         occ_prob_S = 1 - (nonocc_pred_S_pad[:, :, :-1, :] + nonocc_pred_S_pad[:, :, 1:, :]) / 2  # N,1,H,W
         occ_prob_SE = 1 - (nonocc_pred_SE_pad[:, :, :-1, :-1] + nonocc_pred_SE_pad[:, :, 1:, 1:]) / 2  # N,1,H,W
         occ_prob_NE = 1 - (nonocc_pred_NE_pad[:, :, 1:, :-1] + nonocc_pred_NE_pad[:, :, :-1, 1:]) / 2  # N,1,H,W
-
-        occ_edge_prob = (occ_prob_E + occ_prob_S + occ_prob_SE + occ_prob_NE) / 4  # N,1,H,W
-
-    return occ_edge_prob
-
+    if not output_independent_prob:
+        return [(occ_prob_E + occ_prob_S + occ_prob_SE + occ_prob_NE) / 4]  # N,1,H,W
+    else:
+        return [occ_prob_E, occ_prob_S, occ_prob_SE, occ_prob_NE]
 
 def order_prob_to_edge_prob_argmax(nonocc_order_prob):
     """
@@ -842,6 +844,68 @@ def order8_to_order_pixwise(occ_edge_prob, occ_order_E, occ_order_S, occ_order_S
     return occ_order_pix
 
 
+def order8_to_order4_pixwise(occ_edge_prob_list, occ_order_E, occ_order_S, occ_order_SE, occ_order_NE):
+    """
+    convert connectivity-8 pairwise occ order prediction to pixel-wise occ order label H,W,9 for downstream tasks
+    :param occ_edge_prob: H,W ; [0~1] ; tensor
+    :param occ_order_E: 1,H,W ; [0,1,2]
+    :param occ_order_S: 1,H,W ; [0,1,2]
+    :param occ_order_SE: 1,H,W ; [0,1,2]
+    :param occ_order_NE: 1,H,W ; [0,1,2]
+    :return: occ_order_pix; H,W,9 ; occ_edge_prob ([0~127]) + occ_order along 8 neighbor directions ('occlude':1,'occluded':-1,'no occ':0)
+    """
+    occ_list = []
+    for occ_edge_prob in occ_edge_prob:
+        occ_edge_prob = occ_edge_prob.squeeze()
+        H, W = occ_edge_prob.shape
+        
+        occ_edge_prob = occ_edge_prob.squeeze()  # [0,1]
+        occ_order_E = (occ_order_E - 1).squeeze()  # 1,H,W => H,W
+        occ_order_S = (occ_order_S - 1).squeeze()
+        occ_order_SE = (occ_order_SE - 1).squeeze()
+        occ_order_NE = (occ_order_NE - 1).squeeze()
+
+        occ_order_pix = torch.zeros((H, W, 9))
+        occ_order_pix[:, :, 0] = occ_edge_prob[:, :] * 127
+
+        # N,S direction
+        occ_order_pix[1:, :, 2] = -occ_order_S[:-1, :]
+        occ_order_pix[:, :, 7] = occ_order_S[:, :]
+
+        # W,E direction
+        occ_order_pix[:, 1:, 4] = -occ_order_E[:, :-1]
+        occ_order_pix[:, :, 5] = occ_order_E[:, :]
+
+        # NW,SE direction
+        occ_order_pix[1:, 1:, 1] = -occ_order_SE[:-1, :-1]
+        occ_order_pix[:, :, 8] = occ_order_SE[:, :]
+
+        # SW,NE direction
+        occ_order_pix[:-1, 1:, 6] = -occ_order_NE[1:, :-1]
+        occ_order_pix[:, :, 3] = occ_order_NE[:, :]
+
+        # occ_order_pix = np.array(occ_order_pix.detach().cpu()).astype(np.int8)
+        occ_list.append(np.array(occ_order_pix.detach().cpu()).astype(np.int8))
+    
+    occ_order_pix_res = torch.zeros((H, W, 9))
+    for idx in range(len(occ_list)):
+        if idx == 0:
+            dir1 = 4
+            dir2 = 5
+        if idx == 1:
+            dir1 = 2
+            dir2 = 7
+        if idx == 2:
+            dir1 = 1
+            dir2 = 8
+        if idx == 3:
+            dir1 = 3
+            dir2 = 6
+        occ_order_pix_res[:, :, dir1] = occ_list[idx][:, :, dir1]
+        occ_order_pix_res[:, :, dir2] = occ_list[idx][:, :, dir2]
+
+    return occ_order_pix_res
+
 def order8_to_order_pixwise_np(occ_edge_prob, occ_order):
     """
     convert connectivity-8 pairwise occ order prediction to pixel-wise occ order label H,W,9 for downstream tasks
@@ -915,7 +979,7 @@ def nms_occ_order(occ_order_exist_prob, occ_order, occ_thresh):
 
     # gen occ edge prob
     non_occ_probs = 1 - torch.Tensor(order_prob_thin).permute(2, 0, 1).unsqueeze(0)  # N,4,H,W
-    occ_edge_prob = order_prob_to_edge_prob(non_occ_probs)  # N,1,H,W
+    occ_edge_prob = order_prob_to_edge_prob(non_occ_probs)[0]  # N,1,H,W
     occ_edge_prob = occ_edge_prob.numpy()[0, 0, :, :]
 
     return occ_order_thin, occ_edge_prob
