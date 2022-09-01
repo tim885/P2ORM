@@ -618,14 +618,13 @@ def depth_point2plane(depth, fx, fy):
 
 
 # ================================ functions for label conversion in train/val ======================================= #
-def occ_order_pred_to_edge_prob(net_out, config):
+def occ_order_pred_to_edge_prob(net_out, connectivity=4):
     """
     edge-wise occ order prediction to pixel-wise occ edge probability and pairwise occ order probability (occ exists)
     :param net_out: net occ order prediction; N,C,H,W ; tensor
     :return: occ_edge_prob, Nx1xHxW, [0~1]; occ_order_exist_prob, Nx2xHxW or Nx4xHxW, [0~1]
     """
     # softmax
-    connectivity = config.dataset.connectivity
     give_independent_prob = True  # FIXME
 
     occ_order_E_prob_pairwise = F.softmax(net_out[:, 0:3, :, :], dim=1)  # N,1,H,W
@@ -855,7 +854,7 @@ def order8_to_order4_pixwise(occ_edge_prob_list, occ_order_E, occ_order_S, occ_o
     :return: occ_order_pix; H,W,9 ; occ_edge_prob ([0~127]) + occ_order along 8 neighbor directions ('occlude':1,'occluded':-1,'no occ':0)
     """
     occ_list = []
-    for occ_edge_prob in occ_edge_prob:
+    for occ_edge_prob in occ_edge_prob_list:
         occ_edge_prob = occ_edge_prob.squeeze()
         H, W = occ_edge_prob.shape
         
@@ -885,7 +884,7 @@ def order8_to_order4_pixwise(occ_edge_prob_list, occ_order_E, occ_order_S, occ_o
         occ_order_pix[:, :, 3] = occ_order_NE[:, :]
 
         # occ_order_pix = np.array(occ_order_pix.detach().cpu()).astype(np.int8)
-        occ_list.append(np.array(occ_order_pix.detach().cpu()).astype(np.int8))
+        occ_list.append(occ_order_pix)
     
     occ_order_pix_res = torch.zeros((H, W, 9))
     for idx in range(len(occ_list)):
@@ -904,6 +903,7 @@ def order8_to_order4_pixwise(occ_edge_prob_list, occ_order_E, occ_order_S, occ_o
         occ_order_pix_res[:, :, dir1] = occ_list[idx][:, :, dir1]
         occ_order_pix_res[:, :, dir2] = occ_list[idx][:, :, dir2]
 
+    occ_order_pix_res = np.array(occ_order_pix_res.detach().cpu()).astype(np.int8)
     return occ_order_pix_res
 
 def order8_to_order_pixwise_np(occ_edge_prob, occ_order):

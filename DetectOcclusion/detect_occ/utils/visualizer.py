@@ -101,7 +101,7 @@ def viz_and_log(inputs, net_out, targets, viz_writers, idx, epoch, config):
             _, ind_pred_NE = net_out[0, 9:12, :, :].topk(1, dim=0, largest=True, sorted=True)
 
         # gen occ edge prob from occ order
-        edge_prob_pred, _ = occ_order_pred_to_edge_prob(net_out, config)  # N,1,H,W
+        edge_prob_pred, _ = occ_order_pred_to_edge_prob(net_out, config.dataset.connectivity)  # N,1,H,W
 
         # plot
         viz_writers[idx].add_image('occ_order_E.1.gt', order_gt_E.float() / 2, epoch)
@@ -113,9 +113,9 @@ def viz_and_log(inputs, net_out, targets, viz_writers, idx, epoch, config):
             viz_writers[idx].add_image('occ_order_NE.1.gt', order_gt_NE.float() / 2, epoch)
             viz_writers[idx].add_image('occ_order_SE.2.pred', ind_pred_SE.float() / 2, epoch)
             viz_writers[idx].add_image('occ_order_NE.2.pred', ind_pred_NE.float() / 2, epoch)
-
+        edge_prob_pred_n = (edge_prob_pred[0] + edge_prob_pred[1] + edge_prob_pred[2] + edge_prob_pred[3]) / 4
         viz_writers[idx].add_image('Occ_edge.1.gt', edge_gt[0], epoch)
-        viz_writers[idx].add_image('Occ_edge.2.pred', edge_prob_pred[0], epoch)
+        viz_writers[idx].add_image('Occ_edge.2.pred', edge_prob_pred_n[0], epoch)
 
     elif config.network.task_type == 'occ_ori':
         edge_gt        = targets[-1].unsqueeze(1).float()  # N,1,H,W
@@ -159,7 +159,7 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
 
     if config.network.task_type == 'occ_order':
         # gen occ edge/ori/order pred
-        occ_edge_prob, occ_order_exist_prob = occ_order_pred_to_edge_prob(net_out, config)  # N,1,H,W
+        occ_edge_prob, occ_order_exist_prob = occ_order_pred_to_edge_prob(net_out, config.dataset.connectivity)  # N,1,H,W
         occ_ori = occ_order_pred_to_ori(net_out, config.dataset.connectivity)  # N,1,H,W
         _, occ_order_pair_E = net_out[0, :3, :, :].topk(1, dim=0, largest=True, sorted=True)  # 1,H,W; [0,1,2]
         _, occ_order_pair_S = net_out[0, 3:6, :, :].topk(1, dim=0, largest=True, sorted=True)

@@ -90,7 +90,8 @@ class MetricsEvaluator(object):
 
             # cal occ edge metrics
             if not self.isTrain:
-                occ_edge_prob, _ = occ_order_pred_to_edge_prob(net_out, self.config.dataset.connectivity)
+                occ_edge_prob_list, _ = occ_order_pred_to_edge_prob(net_out, self.config.dataset.connectivity)
+                occ_edge_prob = (occ_edge_prob_list[0] + occ_edge_prob_list[1] + occ_edge_prob_list[2] + occ_edge_prob_list[3]) / 4
                 occ_edge_prob_flat = np.array(occ_edge_prob.detach().cpu()).flatten()
                 occ_edge_gt_flat   = np.array(targets[-1].detach().cpu()).flatten().astype(np.int16)
 
