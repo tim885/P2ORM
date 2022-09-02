@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 plt.switch_backend('agg')  # use matplotlib without gui support
 sys.path.append('../..')
 from lib.dataset.gen_label_methods import order4_to_order_pixwise, order8_to_order_pixwise, \
-    occ_order_pred_to_edge_prob, occ_order_pred_to_ori, nms_edge_order_ori, nms_occ_order, order8_to_order_pixwise_np
+    occ_order_pred_to_edge_prob, occ_order_pred_to_ori, nms_edge_order_ori, nms_occ_order, order8_to_order_pixwise_np, occ_order_pred_to_occ_edge_probs, nms_edge
 
 PI = 3.1416
 curr_path = os.path.abspath(os.path.dirname(__file__))
@@ -170,6 +170,9 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
     if config.network.task_type == 'occ_order':
         # gen occ edge/ori/order pred
         occ_edge_prob, occ_order_exist_prob = occ_order_pred_to_edge_prob(net_out, config.dataset.connectivity)  # N,1,H,W
+        
+        occ_edge_prob_list = occ_order_pred_to_occ_edge_probs(net_out)  # occ edge prob along 4 inclineations
+        
         occ_ori = occ_order_pred_to_ori(net_out, config.dataset.connectivity)  # N,1,H,W
         _, occ_order_pair_E = net_out[0, :3, :, :].topk(1, dim=0, largest=True, sorted=True)  # 1,H,W; [0,1,2]
         _, occ_order_pair_S = net_out[0, 3:6, :, :].topk(1, dim=0, largest=True, sorted=True)
@@ -186,6 +189,10 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
 
         # gen occ edge prob and occ ori for vis
         occ_edge_prob_vis = np.array(occ_edge_prob.cpu()[0, 0, :, :] * 255, dtype=np.uint8)  # [0,1] => [0,255]
+        
+        occ_edge_prob_vis_list = [np.array(occ_edge_prob.cpu()[0, 0, :, :] * 255, dtype=np.uint8) 
+                                  for occ_edge_prob in occ_edge_prob_list]  # [0,1] => [0,255]
+        
         occ_ori_vis = (np.array(occ_ori.cpu())[0, 0, :, :] / PI + 1) / 2. * 255.  # [-PI,PI] => [0,255]
 
         # save pred occ order imgs
@@ -228,6 +235,9 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
             if config.TEST.nms_method == 'pixel-wise':  # nms on occ_edge_prob and out occ_edge, occ_order, occ_ori
                 occ_edge_prob_nms, occ_order_pix_nms, occ_order_pair_nms, occ_ori_nms = \
                                nms_edge_order_ori(occ_edge_prob_vis, occ_order_pix, occ_ori_vis, config.TEST.occ_thresh)
+
+                occ_edge_prob_nms_list = [nms_edge(occ_edge_prob_vis) for occ_edge_prob_vis in occ_edge_prob_vis_list]
+
                 occ_ori_nms_path = os.path.join(img_eval_dir, '{}_lab_v_g_ori_nms.png'.format(img_name))
                 Image.fromarray(occ_ori_nms.astype(np.uint8), mode='L').save(occ_ori_nms_path)
             elif config.TEST.nms_method == 'pairwise':  # nms occ_order_prob and out occ_edge, occ_order (not for eval)
@@ -238,6 +248,11 @@ def viz_and_save(net_in, net_out, img_abs_path, out_dir, config, epoch):
 
             # save imgs of occ_edge and occ_order
             Image.fromarray((occ_edge_prob_nms * 255).astype(np.uint8), mode='L').save(occ_edge_prob_nms_path)
+
+            for idx, edge_prob_nms in enumerate(occ_edge_prob_nms_list):
+                edge_prob_nms_path = os.path.join(img_eval_dir, '{}_lab_v_g_nms_incli_{}.png'.format(img_name, idx))
+                Image.fromarray((edge_prob_nms * 255).astype(np.uint8), mode='L').save(edge_prob_nms_path)
+
             Image.fromarray(((occ_order_pair_nms[:, :, 0]+1)/2.*255.).astype(np.uint8), mode='L').save(occ_order_E_nms_path)
             Image.fromarray(((occ_order_pair_nms[:, :, 1]+1)/2.*255.).astype(np.uint8), mode='L').save(occ_order_S_nms_path)
             Image.fromarray(((occ_order_pair_nms[:, :, 2]+1)/2.*255.).astype(np.uint8), mode='L').save(occ_order_SE_nms_path)

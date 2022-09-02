@@ -650,7 +650,32 @@ def occ_order_pred_to_edge_prob(net_out, connectivity=4):
     return occ_edge_prob, occ_order_exist_prob
 
 
-def order_prob_to_edge_prob(nonocc_order_prob):
+def occ_order_pred_to_occ_edge_probs(net_out):
+    """
+    edge-wise occ order prediction to pixel-wise occ edge probability and pairwise occ order probability (occ exists)
+    :param net_out: net occ order prediction; N,C,H,W ; tensor
+    :return: occ_edge_prob_list, [Nx1xHxW,], [0~1]; occ_order_exist_prob, Nx2xHxW or Nx4xHxW, [0~1]
+    """
+    # softmax
+    occ_order_E_prob_pairwise = F.softmax(net_out[:, 0:3, :, :], dim=1)  # N,1,H,W
+    occ_order_S_prob_pairwise = F.softmax(net_out[:, 3:6, :, :], dim=1)  # N,1,H,W
+    non_occ_prob_E_pairwise = occ_order_E_prob_pairwise[:, 1, :, :].unsqueeze(1)  # N,1,H,W
+    non_occ_prob_S_pairwise = occ_order_S_prob_pairwise[:, 1, :, :].unsqueeze(1)
+    
+    occ_order_SE_prob_pairwise = F.softmax(net_out[:, 6:9, :, :], dim=1)  # N,1,H,W
+    occ_order_NE_prob_pairwise = F.softmax(net_out[:, 9:12, :, :], dim=1)  # N,1,H,W
+    non_occ_prob_SE_pairwise = occ_order_SE_prob_pairwise[:, 1, :, :].unsqueeze(1)  # N,1,H,W
+    non_occ_prob_NE_pairwise = occ_order_NE_prob_pairwise[:, 1, :, :].unsqueeze(1)
+
+    # average to get pixel-wise occ_edge_prob and pairwise occ_order_exist_prob along each inclination
+    non_occ_order_probs = torch.cat((non_occ_prob_E_pairwise, non_occ_prob_S_pairwise,
+                                     non_occ_prob_SE_pairwise, non_occ_prob_NE_pairwise), 1)  # N,4,H,W
+    occ_edge_prob_list = order_prob_to_edge_prob(non_occ_order_probs, out_all_edge_prob=True)
+        
+    return occ_edge_prob_list
+
+
+def order_prob_to_edge_prob(nonocc_order_prob, out_all_edge_prob=False):
     """
     convert pairwise occ order prob to pixel-wise occ edge prob by average
     :param nonocc_order_prob: occ order prob for non-occlusion; Nx2xHxW or Nx4xHxW; tensor
@@ -679,7 +704,10 @@ def order_prob_to_edge_prob(nonocc_order_prob):
 
         occ_edge_prob = (occ_prob_E + occ_prob_S + occ_prob_SE + occ_prob_NE) / 4  # N,1,H,W
 
-    return occ_edge_prob
+    if nonocc_order_prob.shape[1] == 4 and out_all_edge_prob:
+        return [occ_prob_E, occ_prob_S, occ_prob_SE, occ_prob_NE]
+    else:
+        return occ_edge_prob
 
 
 def order_prob_to_edge_prob_argmax(nonocc_order_prob):
@@ -894,6 +922,18 @@ def nms_edge_order_ori(occ_edge, occ_order_pix, occ_ori, occ_thresh):
     occ_ori_thin[no_occ] = 127
 
     return occ_edge_thin, order_pix_thin, order_pair_thin, occ_ori_thin
+
+
+def nms_edge(occ_edge_prob):
+    """
+    nms pixel-wise edge_prob then mask out non-occlusion region to thin occ order and occ ori
+    :param occ_edge: numpy, HxW, [0~255]
+    :return: edge_thin
+    """
+    occ_edge_prob = occ_edge_prob / 255.
+    occ_edge_prob_thin = edge_nms(occ_edge_prob)  # [0~1]
+
+    return occ_edge_prob_thin
 
 
 def nms_occ_order(occ_order_exist_prob, occ_order, occ_thresh):
